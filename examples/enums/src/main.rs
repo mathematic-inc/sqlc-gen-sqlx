@@ -2,7 +2,7 @@
 #[cfg(test)]
 mod queries;
 #[cfg(test)]
-use queries::{Queries, Status};
+use queries::{CreateUserParams, Queries, Status};
 #[cfg(test)]
 use sqlx::{Connection as _, PgConnection};
 
@@ -42,9 +42,12 @@ async fn test_enum_roundtrip() {
 
     let mut q = Queries::new(conn);
 
-    q.create_user("Alice".to_string(), Status::Active)
-        .await
-        .expect("create");
+    q.create_user(CreateUserParams {
+        name: "Alice".to_string(),
+        status: Status::Active,
+    })
+    .await
+    .expect("create");
 
     let user = q.get_user(1).await.expect("get");
     assert_eq!(user.name, "Alice");

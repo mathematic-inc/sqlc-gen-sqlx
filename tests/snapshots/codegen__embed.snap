@@ -19,6 +19,46 @@ pub struct GetAuthorEmbedRow {
     #[sqlx(flatten)]
     pub authors: AuthorsEmbed,
 }
+pub trait AsExecutor {
+    type Exec<'c>: sqlx::Executor<'c, Database = sqlx::Postgres> where Self: 'c;
+    fn as_executor(&mut self) -> Self::Exec<'_>;
+}
+impl AsExecutor for sqlx::PgPool {
+    type Exec<'c> = &'c sqlx::PgPool where Self: 'c;
+    fn as_executor(&mut self) -> Self::Exec<'_> {
+        &*self
+    }
+}
+impl AsExecutor for &sqlx::PgPool {
+    type Exec<'c> = &'c sqlx::PgPool where Self: 'c;
+    fn as_executor(&mut self) -> Self::Exec<'_> {
+        *self
+    }
+}
+impl AsExecutor for sqlx::PgConnection {
+    type Exec<'c> = &'c mut sqlx::PgConnection where Self: 'c;
+    fn as_executor(&mut self) -> Self::Exec<'_> {
+        self
+    }
+}
+impl AsExecutor for sqlx::Transaction<'_, sqlx::Postgres> {
+    type Exec<'c> = &'c mut sqlx::PgConnection where Self: 'c;
+    fn as_executor(&mut self) -> Self::Exec<'_> {
+        &mut **self
+    }
+}
+impl AsExecutor for sqlx::pool::PoolConnection<sqlx::Postgres> {
+    type Exec<'c> = &'c mut sqlx::PgConnection where Self: 'c;
+    fn as_executor(&mut self) -> Self::Exec<'_> {
+        &mut **self
+    }
+}
+impl<T: AsExecutor + ?Sized> AsExecutor for &mut T {
+    type Exec<'c> = T::Exec<'c> where Self: 'c;
+    fn as_executor(&mut self) -> Self::Exec<'_> {
+        (**self).as_executor()
+    }
+}
 pub struct Queries<E> {
     db: E,
 }
@@ -27,17 +67,14 @@ impl<E> Queries<E> {
         Self { db }
     }
 }
-impl<E> Queries<E>
-where
-    for<'c> &'c mut E: sqlx::Executor<'c, Database = sqlx::Postgres>,
-{
+impl<E: AsExecutor> Queries<E> {
     pub async fn get_author_embed(
         &mut self,
         id: i64,
     ) -> Result<GetAuthorEmbedRow, sqlx::Error> {
         sqlx::query_as::<_, GetAuthorEmbedRow>(GET_AUTHOR_EMBED)
             .bind(id)
-            .fetch_one(&mut self.db)
+            .fetch_one(self.db.as_executor())
             .await
     }
 }

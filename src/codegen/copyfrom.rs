@@ -68,7 +68,7 @@ pub fn gen_copyfrom(
                     #builder_binds
                 });
 
-                rows_affected += query_builder.build().execute(&mut self.db).await?.rows_affected();
+                rows_affected += query_builder.build().execute(self.db.as_executor()).await?.rows_affected();
             }
 
             Ok(rows_affected)
