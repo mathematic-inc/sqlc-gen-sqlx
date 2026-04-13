@@ -1,0 +1,11 @@
+[package]
+name = "advanced-types"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+sqlx = { workspace = true }
+tokio = { workspace = true }
+chrono = "0.4"
+bit-vec = "0.6"
+bigdecimal = "0.4"

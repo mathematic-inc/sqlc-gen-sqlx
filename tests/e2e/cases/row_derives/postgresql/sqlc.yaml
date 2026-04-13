@@ -1,0 +1,16 @@
+version: "2"
+plugins:
+  - name: sqlx
+    process:
+      cmd: {{plugin_binary}}
+sql:
+  - engine: "postgresql"
+    schema: "schema.sql"
+    queries: "query.sql"
+    codegen:
+      - plugin: "sqlx"
+        out: "src"
+        options:
+          row_derives:
+            - PartialEq
+            - Eq
