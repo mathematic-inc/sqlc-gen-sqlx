@@ -81,6 +81,9 @@ impl<E> Queries<E> {
     pub fn new(db: E) -> Self {
         Self { db }
     }
+    pub fn into_inner(self) -> E {
+        self.db
+    }
 }
 impl<E: AsExecutor> Queries<E> {
     pub fn batch_get_author<'a, I>(

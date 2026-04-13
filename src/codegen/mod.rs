@@ -97,6 +97,10 @@ pub fn generate(request: &GenerateRequestView<'_>, config: &Config) -> Result<St
             pub fn new(db: E) -> Self {
                 Self { db }
             }
+
+            pub fn into_inner(self) -> E {
+                self.db
+            }
         }
     });
 
