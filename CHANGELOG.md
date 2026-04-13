@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.1.1...v0.1.2) (2026-04-13)
+
+
+### Features
+
+* Add Queries::into_inner ([#6](https://github.com/mathematic-inc/sqlc-gen-sqlx/issues/6)) ([5e5058e](https://github.com/mathematic-inc/sqlc-gen-sqlx/commit/5e5058e0a0e05ac566cb81e1d9d292dac3797007))
+
 ## [0.1.1](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.1.0...v0.1.1) (2026-04-13)
 
 
