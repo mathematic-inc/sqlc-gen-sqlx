@@ -100,7 +100,7 @@ pub fn gen_batchexec(
             #sql_setup
             let mut query = sqlx::query(&sql);
             #bind_setup
-            query.execute(&mut *db).await?;
+            query.execute(db.as_executor()).await?;
             Ok(Some(((), (db, items))))
         }
     } else if params.len() >= 2 {
@@ -109,7 +109,7 @@ pub fn gen_batchexec(
         quote! {
             sqlx::query(#const_name)
                 #binds
-                .execute(&mut *db)
+                .execute(db.as_executor())
                 .await?;
             Ok(Some(((), (db, items))))
         }
@@ -117,7 +117,7 @@ pub fn gen_batchexec(
         quote! {
             sqlx::query(#const_name)
                 .bind(item)
-                .execute(&mut *db)
+                .execute(db.as_executor())
                 .await?;
             Ok(Some(((), (db, items))))
         }
@@ -160,7 +160,7 @@ pub fn gen_batchone(
             #sql_setup
             let mut query = sqlx::query_as::<_, #row_name>(&sql);
             #bind_setup
-            let row = query.fetch_one(&mut *db).await?;
+            let row = query.fetch_one(db.as_executor()).await?;
             Ok(Some((row, (db, items))))
         }
     } else if params.len() >= 2 {
@@ -169,7 +169,7 @@ pub fn gen_batchone(
         quote! {
             let row = sqlx::query_as::<_, #row_name>(#const_name)
                 #binds
-                .fetch_one(&mut *db)
+                .fetch_one(db.as_executor())
                 .await?;
             Ok(Some((row, (db, items))))
         }
@@ -177,7 +177,7 @@ pub fn gen_batchone(
         quote! {
             let row = sqlx::query_as::<_, #row_name>(#const_name)
                 .bind(item)
-                .fetch_one(&mut *db)
+                .fetch_one(db.as_executor())
                 .await?;
             Ok(Some((row, (db, items))))
         }
@@ -220,7 +220,7 @@ pub fn gen_batchmany(
             #sql_setup
             let mut query = sqlx::query_as::<_, #row_name>(&sql);
             #bind_setup
-            let rows = query.fetch_all(&mut *db).await?;
+            let rows = query.fetch_all(db.as_executor()).await?;
             Ok(Some((rows, (db, items))))
         }
     } else if params.len() >= 2 {
@@ -229,7 +229,7 @@ pub fn gen_batchmany(
         quote! {
             let rows = sqlx::query_as::<_, #row_name>(#const_name)
                 #binds
-                .fetch_all(&mut *db)
+                .fetch_all(db.as_executor())
                 .await?;
             Ok(Some((rows, (db, items))))
         }
@@ -237,7 +237,7 @@ pub fn gen_batchmany(
         quote! {
             let rows = sqlx::query_as::<_, #row_name>(#const_name)
                 .bind(item)
-                .fetch_all(&mut *db)
+                .fetch_all(db.as_executor())
                 .await?;
             Ok(Some((rows, (db, items))))
         }

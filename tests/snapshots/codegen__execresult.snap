@@ -8,6 +8,46 @@ expression: code
 #![allow(dead_code, reason = "generated queries may expose items a caller does not use")]
 
 const DELETE_AUTHOR_RESULT: &str = "DELETE FROM authors WHERE id = $1";
+pub trait AsExecutor {
+    type Exec<'c>: sqlx::Executor<'c, Database = sqlx::Postgres> where Self: 'c;
+    fn as_executor(&mut self) -> Self::Exec<'_>;
+}
+impl AsExecutor for sqlx::PgPool {
+    type Exec<'c> = &'c sqlx::PgPool where Self: 'c;
+    fn as_executor(&mut self) -> Self::Exec<'_> {
+        &*self
+    }
+}
+impl AsExecutor for &sqlx::PgPool {
+    type Exec<'c> = &'c sqlx::PgPool where Self: 'c;
+    fn as_executor(&mut self) -> Self::Exec<'_> {
+        *self
+    }
+}
+impl AsExecutor for sqlx::PgConnection {
+    type Exec<'c> = &'c mut sqlx::PgConnection where Self: 'c;
+    fn as_executor(&mut self) -> Self::Exec<'_> {
+        self
+    }
+}
+impl AsExecutor for sqlx::Transaction<'_, sqlx::Postgres> {
+    type Exec<'c> = &'c mut sqlx::PgConnection where Self: 'c;
+    fn as_executor(&mut self) -> Self::Exec<'_> {
+        &mut **self
+    }
+}
+impl AsExecutor for sqlx::pool::PoolConnection<sqlx::Postgres> {
+    type Exec<'c> = &'c mut sqlx::PgConnection where Self: 'c;
+    fn as_executor(&mut self) -> Self::Exec<'_> {
+        &mut **self
+    }
+}
+impl<T: AsExecutor + ?Sized> AsExecutor for &mut T {
+    type Exec<'c> = T::Exec<'c> where Self: 'c;
+    fn as_executor(&mut self) -> Self::Exec<'_> {
+        (**self).as_executor()
+    }
+}
 pub struct Queries<E> {
     db: E,
 }
@@ -16,14 +56,11 @@ impl<E> Queries<E> {
         Self { db }
     }
 }
-impl<E> Queries<E>
-where
-    for<'c> &'c mut E: sqlx::Executor<'c, Database = sqlx::Postgres>,
-{
+impl<E: AsExecutor> Queries<E> {
     pub async fn delete_author_result(
         &mut self,
         id: i64,
     ) -> Result<sqlx::postgres::PgQueryResult, sqlx::Error> {
-        sqlx::query(DELETE_AUTHOR_RESULT).bind(id).execute(&mut self.db).await
+        sqlx::query(DELETE_AUTHOR_RESULT).bind(id).execute(self.db.as_executor()).await
     }
 }

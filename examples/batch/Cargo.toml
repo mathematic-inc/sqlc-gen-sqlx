@@ -6,3 +6,5 @@ edition = "2024"
 [dependencies]
 sqlx = { workspace = true }
 tokio = { workspace = true }
+futures-core = "0.3"
+futures-util = "0.3"

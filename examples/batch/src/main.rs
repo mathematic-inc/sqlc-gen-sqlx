@@ -2,6 +2,8 @@
 #[path = "queries.rs"]
 mod queries;
 #[cfg(test)]
+use futures_util::TryStreamExt;
+#[cfg(test)]
 use queries::Queries;
 #[cfg(test)]
 use sqlx::{Connection as _, PgConnection};
@@ -34,12 +36,18 @@ async fn test_batch_roundtrip() {
 
     let mut q = Queries::new(conn);
 
-    let authors = q.batch_get_author(vec![1, 2]).await.expect("batch get");
+    let authors: Vec<_> = q
+        .batch_get_author(vec![1, 2])
+        .try_collect()
+        .await
+        .expect("batch get");
     assert_eq!(authors.len(), 2);
     assert_eq!(authors[0].name, "Alice");
     assert_eq!(authors[1].name, "Bob");
 
-    q.batch_delete_author(vec![1, 2])
+    let _: Vec<()> = q
+        .batch_delete_author(vec![1, 2])
+        .try_collect()
         .await
         .expect("batch delete");
 

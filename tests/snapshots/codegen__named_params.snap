@@ -13,6 +13,46 @@ pub struct UpdateAuthorNamedParamsParams {
     pub author_id: i64,
 }
 const UPDATE_AUTHOR_NAMED_PARAMS: &str = "UPDATE authors SET name = $1 WHERE id = $2";
+pub trait AsExecutor {
+    type Exec<'c>: sqlx::Executor<'c, Database = sqlx::Postgres> where Self: 'c;
+    fn as_executor(&mut self) -> Self::Exec<'_>;
+}
+impl AsExecutor for sqlx::PgPool {
+    type Exec<'c> = &'c sqlx::PgPool where Self: 'c;
+    fn as_executor(&mut self) -> Self::Exec<'_> {
+        &*self
+    }
+}
+impl AsExecutor for &sqlx::PgPool {
+    type Exec<'c> = &'c sqlx::PgPool where Self: 'c;
+    fn as_executor(&mut self) -> Self::Exec<'_> {
+        *self
+    }
+}
+impl AsExecutor for sqlx::PgConnection {
+    type Exec<'c> = &'c mut sqlx::PgConnection where Self: 'c;
+    fn as_executor(&mut self) -> Self::Exec<'_> {
+        self
+    }
+}
+impl AsExecutor for sqlx::Transaction<'_, sqlx::Postgres> {
+    type Exec<'c> = &'c mut sqlx::PgConnection where Self: 'c;
+    fn as_executor(&mut self) -> Self::Exec<'_> {
+        &mut **self
+    }
+}
+impl AsExecutor for sqlx::pool::PoolConnection<sqlx::Postgres> {
+    type Exec<'c> = &'c mut sqlx::PgConnection where Self: 'c;
+    fn as_executor(&mut self) -> Self::Exec<'_> {
+        &mut **self
+    }
+}
+impl<T: AsExecutor + ?Sized> AsExecutor for &mut T {
+    type Exec<'c> = T::Exec<'c> where Self: 'c;
+    fn as_executor(&mut self) -> Self::Exec<'_> {
+        (**self).as_executor()
+    }
+}
 pub struct Queries<E> {
     db: E,
 }
@@ -21,10 +61,7 @@ impl<E> Queries<E> {
         Self { db }
     }
 }
-impl<E> Queries<E>
-where
-    for<'c> &'c mut E: sqlx::Executor<'c, Database = sqlx::Postgres>,
-{
+impl<E: AsExecutor> Queries<E> {
     pub async fn update_author_named_params(
         &mut self,
         arg: UpdateAuthorNamedParamsParams,
@@ -32,7 +69,7 @@ where
         sqlx::query(UPDATE_AUTHOR_NAMED_PARAMS)
             .bind(arg.set_name)
             .bind(arg.author_id)
-            .execute(&mut self.db)
+            .execute(self.db.as_executor())
             .await?;
         Ok(())
     }
