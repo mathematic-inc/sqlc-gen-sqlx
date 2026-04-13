@@ -1,0 +1,16 @@
+version: "2"
+plugins:
+  - name: sqlc-gen-sqlx
+    wasm:
+      url: file://target/wasm32-wasip1/debug/sqlc-gen-sqlx.wasm
+      sha256: "8e453f461e97ef85246e94b56842efbda064380bfa672a1396c229cc57f0a1e7"
+
+sql:
+  - schema: examples/basic/schema.sql
+    queries: examples/basic/queries.sql
+    engine: postgresql
+    codegen:
+      - plugin: sqlc-gen-sqlx
+        out: examples/basic/src
+        options:
+          output: queries.rs

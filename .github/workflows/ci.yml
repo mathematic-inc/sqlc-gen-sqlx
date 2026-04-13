@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: sqlc
+          POSTGRES_PASSWORD: sqlc
+          POSTGRES_DB: sqlc_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install sqlc
+        uses: sqlc-dev/setup-sqlc@v5
+        with:
+          sqlc-version: "1.30.0"
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Format check
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Snapshot tests
+        run: cargo test --workspace
+        env:
+          INSTA_UPDATE: unseen
+
+      - name: Build WASM plugin
+        run: cargo build --target wasm32-wasip1
+
+      - name: Integration tests
+        run: cargo test -p basic
+        env:
+          DATABASE_URL: postgres://sqlc:sqlc@localhost:5432/sqlc_test
+
+  proto-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install buf
+        uses: bufbuild/buf-action@v1
+        with:
+          setup_only: true
+
+      - name: Install protoc-gen-buffa
+        run: cargo install --locked protoc-gen-buffa@0.3.0 protoc-gen-buffa-packaging@0.3.0
+
+      - name: Verify proto bindings are up to date
+        run: |
+          buf generate
+          git diff --exit-code src/plugin/
