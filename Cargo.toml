@@ -12,6 +12,8 @@ name = "sqlc-gen-sqlx"
 version = "0.0.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
+description = "A sqlc plugin that generates type-safe sqlx Rust code from SQL queries."
+repository = "https://github.com/mathematic-inc/sqlc-gen-sqlx"
 
 [[bin]]
 name = "sqlc-gen-sqlx"
