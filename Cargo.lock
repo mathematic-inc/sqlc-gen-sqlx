@@ -187,6 +187,8 @@ dependencies = [
 name = "batch"
 version = "0.1.0"
 dependencies = [
+ "futures-core",
+ "futures-util",
  "sqlx",
  "tokio",
 ]

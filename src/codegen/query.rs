@@ -447,7 +447,7 @@ pub fn gen_one(
                 #sql_setup
                 let mut query = sqlx::query_as::<_, #row_name>(&sql);
                 #bind_setup
-                query.fetch_one(&mut self.db).await
+                query.fetch_one(self.db.as_executor()).await
             }
         }
     } else {
@@ -455,7 +455,7 @@ pub fn gen_one(
             pub async fn #fn_name(&mut self, #fn_params) -> Result<#row_name, sqlx::Error> {
                 sqlx::query_as::<_, #row_name>(#const_name)
                     #binds
-                    .fetch_one(&mut self.db)
+                    .fetch_one(self.db.as_executor())
                     .await
             }
         }
@@ -498,7 +498,7 @@ pub fn gen_many(
                 #sql_setup
                 let mut query = sqlx::query_as::<_, #row_name>(&sql);
                 #bind_setup
-                query.fetch_all(&mut self.db).await
+                query.fetch_all(self.db.as_executor()).await
             }
         }
     } else {
@@ -506,7 +506,7 @@ pub fn gen_many(
             pub async fn #fn_name(&mut self, #fn_params) -> Result<Vec<#row_name>, sqlx::Error> {
                 sqlx::query_as::<_, #row_name>(#const_name)
                     #binds
-                    .fetch_all(&mut self.db)
+                    .fetch_all(self.db.as_executor())
                     .await
             }
         }
@@ -543,7 +543,7 @@ pub fn gen_execrows(
                 #sql_setup
                 let mut query = sqlx::query(&sql);
                 #bind_setup
-                let result = query.execute(&mut self.db).await?;
+                let result = query.execute(self.db.as_executor()).await?;
                 Ok(result.rows_affected())
             }
         }
@@ -552,7 +552,7 @@ pub fn gen_execrows(
             pub async fn #fn_name(&mut self, #fn_params) -> Result<u64, sqlx::Error> {
                 let result = sqlx::query(#const_name)
                     #binds
-                    .execute(&mut self.db)
+                    .execute(self.db.as_executor())
                     .await?;
                 Ok(result.rows_affected())
             }
@@ -583,7 +583,7 @@ pub fn gen_execresult(
                 #sql_setup
                 let mut query = sqlx::query(&sql);
                 #bind_setup
-                query.execute(&mut self.db).await
+                query.execute(self.db.as_executor()).await
             }
         }
     } else {
@@ -591,7 +591,7 @@ pub fn gen_execresult(
             pub async fn #fn_name(&mut self, #fn_params) -> Result<sqlx::postgres::PgQueryResult, sqlx::Error> {
                 sqlx::query(#const_name)
                     #binds
-                    .execute(&mut self.db)
+                    .execute(self.db.as_executor())
                     .await
             }
         }
@@ -625,7 +625,7 @@ pub fn gen_exec(
                 #sql_setup
                 let mut query = sqlx::query(&sql);
                 #bind_setup
-                query.execute(&mut self.db).await?;
+                query.execute(self.db.as_executor()).await?;
                 Ok(())
             }
         }
@@ -634,7 +634,7 @@ pub fn gen_exec(
             pub async fn #fn_name(&mut self, #fn_params) -> Result<(), sqlx::Error> {
                 sqlx::query(#const_name)
                     #binds
-                    .execute(&mut self.db)
+                    .execute(self.db.as_executor())
                     .await?;
                 Ok(())
             }
@@ -686,7 +686,7 @@ pub fn gen_execlastid(
                 #sql_setup
                 let mut query = sqlx::query_as(&sql);
                 #bind_setup
-                let (_row,): (#ret_ty,) = query.fetch_one(&mut self.db).await?;
+                let (_row,): (#ret_ty,) = query.fetch_one(self.db.as_executor()).await?;
                 Ok(_row)
             }
         }
@@ -695,7 +695,7 @@ pub fn gen_execlastid(
             pub async fn #fn_name(&mut self, #fn_params) -> Result<#ret_ty, sqlx::Error> {
                 let (_row,): (#ret_ty,) = sqlx::query_as(#const_name)
                     #binds
-                    .fetch_one(&mut self.db)
+                    .fetch_one(self.db.as_executor())
                     .await?;
                 Ok(_row)
             }

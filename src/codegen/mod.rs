@@ -52,6 +52,43 @@ pub fn generate(request: &GenerateRequestView<'_>, config: &Config) -> Result<St
     }
 
     emitter.push(quote::quote! {
+        pub trait AsExecutor {
+            type Exec<'c>: sqlx::Executor<'c, Database = sqlx::Postgres>
+            where
+                Self: 'c;
+            fn as_executor(&mut self) -> Self::Exec<'_>;
+        }
+
+        impl AsExecutor for sqlx::PgPool {
+            type Exec<'c> = &'c sqlx::PgPool where Self: 'c;
+            fn as_executor(&mut self) -> Self::Exec<'_> { &*self }
+        }
+
+        impl AsExecutor for &sqlx::PgPool {
+            type Exec<'c> = &'c sqlx::PgPool where Self: 'c;
+            fn as_executor(&mut self) -> Self::Exec<'_> { *self }
+        }
+
+        impl AsExecutor for sqlx::PgConnection {
+            type Exec<'c> = &'c mut sqlx::PgConnection where Self: 'c;
+            fn as_executor(&mut self) -> Self::Exec<'_> { self }
+        }
+
+        impl AsExecutor for sqlx::Transaction<'_, sqlx::Postgres> {
+            type Exec<'c> = &'c mut sqlx::PgConnection where Self: 'c;
+            fn as_executor(&mut self) -> Self::Exec<'_> { &mut **self }
+        }
+
+        impl AsExecutor for sqlx::pool::PoolConnection<sqlx::Postgres> {
+            type Exec<'c> = &'c mut sqlx::PgConnection where Self: 'c;
+            fn as_executor(&mut self) -> Self::Exec<'_> { &mut **self }
+        }
+
+        impl<T: AsExecutor + ?Sized> AsExecutor for &mut T {
+            type Exec<'c> = T::Exec<'c> where Self: 'c;
+            fn as_executor(&mut self) -> Self::Exec<'_> { (**self).as_executor() }
+        }
+
         pub struct Queries<E> {
             db: E,
         }
@@ -65,10 +102,7 @@ pub fn generate(request: &GenerateRequestView<'_>, config: &Config) -> Result<St
 
     if !impl_fns.is_empty() {
         emitter.push(quote::quote! {
-            impl<E> Queries<E>
-            where
-                for<'c> &'c mut E: sqlx::Executor<'c, Database = sqlx::Postgres>,
-            {
+            impl<E: AsExecutor> Queries<E> {
                 #(#impl_fns)*
             }
         });
