@@ -15,42 +15,35 @@ pub struct ListAuthorsByIdsRow {
     pub bio: Option<String>,
 }
 pub trait AsExecutor {
-    type Exec<'c>: sqlx::Executor<'c, Database = sqlx::Postgres> where Self: 'c;
-    fn as_executor(&mut self) -> Self::Exec<'_>;
+    fn as_executor(&mut self) -> impl sqlx::Executor<'_, Database = sqlx::Postgres>;
 }
 impl AsExecutor for sqlx::PgPool {
-    type Exec<'c> = &'c sqlx::PgPool where Self: 'c;
-    fn as_executor(&mut self) -> Self::Exec<'_> {
+    fn as_executor(&mut self) -> impl sqlx::Executor<'_, Database = sqlx::Postgres> {
         &*self
     }
 }
 impl AsExecutor for &sqlx::PgPool {
-    type Exec<'c> = &'c sqlx::PgPool where Self: 'c;
-    fn as_executor(&mut self) -> Self::Exec<'_> {
+    fn as_executor(&mut self) -> impl sqlx::Executor<'_, Database = sqlx::Postgres> {
         *self
     }
 }
 impl AsExecutor for sqlx::PgConnection {
-    type Exec<'c> = &'c mut sqlx::PgConnection where Self: 'c;
-    fn as_executor(&mut self) -> Self::Exec<'_> {
-        self
+    fn as_executor(&mut self) -> impl sqlx::Executor<'_, Database = sqlx::Postgres> {
+        &mut *self
     }
 }
 impl AsExecutor for sqlx::Transaction<'_, sqlx::Postgres> {
-    type Exec<'c> = &'c mut sqlx::PgConnection where Self: 'c;
-    fn as_executor(&mut self) -> Self::Exec<'_> {
+    fn as_executor(&mut self) -> impl sqlx::Executor<'_, Database = sqlx::Postgres> {
         &mut **self
     }
 }
 impl AsExecutor for sqlx::pool::PoolConnection<sqlx::Postgres> {
-    type Exec<'c> = &'c mut sqlx::PgConnection where Self: 'c;
-    fn as_executor(&mut self) -> Self::Exec<'_> {
+    fn as_executor(&mut self) -> impl sqlx::Executor<'_, Database = sqlx::Postgres> {
         &mut **self
     }
 }
 impl<T: AsExecutor + ?Sized> AsExecutor for &mut T {
-    type Exec<'c> = T::Exec<'c> where Self: 'c;
-    fn as_executor(&mut self) -> Self::Exec<'_> {
+    fn as_executor(&mut self) -> impl sqlx::Executor<'_, Database = sqlx::Postgres> {
         (**self).as_executor()
     }
 }
