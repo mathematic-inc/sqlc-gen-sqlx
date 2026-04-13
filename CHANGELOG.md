@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.1.2...v0.1.3) (2026-04-13)
+
+
+### Code Refactoring
+
+* Simplify AsExecutor to use return-position impl Trait ([#8](https://github.com/mathematic-inc/sqlc-gen-sqlx/issues/8))
+
 ## [0.1.2](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.1.1...v0.1.2) (2026-04-13)
 
 
