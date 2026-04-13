@@ -1,0 +1,11 @@
+[package]
+name = "generated-e2e-{{package_name}}"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+futures-core = "0.3"
+futures-util = "0.3"
+serde_json = "1"
+sqlx = { version = "0.8", features = ["postgres", "runtime-tokio", "macros", "uuid", "chrono", "ipnetwork", "mac_address", "bit-vec", "bigdecimal"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

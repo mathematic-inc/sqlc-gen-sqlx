@@ -1,0 +1,127 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - v*
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: sqlc
+          POSTGRES_PASSWORD: sqlc
+          POSTGRES_DB: sqlc_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install sqlc
+        uses: sqlc-dev/setup-sqlc@v5
+        with:
+          sqlc-version: "1.30.0"
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Format check
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Snapshot tests
+        run: cargo test --workspace
+        env:
+          INSTA_UPDATE: unseen
+
+      - name: Build release WASM plugin
+        run: cargo build --release --target wasm32-wasip1
+
+      - name: Integration tests
+        run: cargo test -p basic
+        env:
+          DATABASE_URL: postgres://sqlc:sqlc@localhost:5432/sqlc_test
+
+  publish-release:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build release WASM plugin
+        run: cargo build --release --target wasm32-wasip1
+
+      - name: Package release assets
+        run: |
+          mkdir -p dist
+          cp target/wasm32-wasip1/release/sqlc-gen-sqlx.wasm dist/sqlc-gen-sqlx.wasm
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum dist/sqlc-gen-sqlx.wasm > dist/sqlc-gen-sqlx.wasm.sha256
+          else
+            shasum -a 256 dist/sqlc-gen-sqlx.wasm > dist/sqlc-gen-sqlx.wasm.sha256
+          fi
+
+      - name: Ensure GitHub release exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            exit 0
+          fi
+
+          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
+            gh release create "${GITHUB_REF_NAME}" \
+              --title "${GITHUB_REF_NAME}" \
+              --generate-notes \
+              --prerelease
+          else
+            gh release create "${GITHUB_REF_NAME}" \
+              --title "${GITHUB_REF_NAME}" \
+              --generate-notes \
+              --latest
+          fi
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${GITHUB_REF_NAME}" \
+            dist/sqlc-gen-sqlx.wasm \
+            dist/sqlc-gen-sqlx.wasm.sha256 \
+            --clobber

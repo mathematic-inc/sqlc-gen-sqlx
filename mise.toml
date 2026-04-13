@@ -1,0 +1,58 @@
+[tools]
+rust = "stable"
+
+[tasks.build]
+description = "Build WASM plugin (debug)"
+run = "cargo build --target wasm32-wasip1"
+
+[tasks.build-release]
+description = "Build WASM plugin (release)"
+run = "cargo build --target wasm32-wasip1 --release"
+
+[tasks.test]
+description = "Run all tests"
+run = "cargo test --workspace"
+
+[tasks.lint]
+description = "Run clippy"
+run = "cargo clippy --workspace --all-targets -- -D warnings"
+
+[tasks.fmt]
+description = "Format code"
+run = "cargo fmt --all"
+
+[tasks.fmt-check]
+description = "Check formatting (CI)"
+run = "cargo fmt --all --check"
+
+[tasks.proto-sync]
+description = "Sync codegen.proto from sqlc upstream"
+run = "bash scripts/proto-sync.sh"
+
+[tasks.proto-gen]
+description = "Regenerate buffa bindings from proto (output is checked in)"
+run = "buf generate"
+
+[tasks.proto-check]
+description = "Verify checked-in proto bindings are up-to-date (CI)"
+run = """
+buf generate
+git diff --exit-code src/plugin/
+"""
+
+[tasks.generate]
+description = "Rebuild WASM and run sqlc generate against examples"
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+cargo build --target wasm32-wasip1
+if command -v sha256sum >/dev/null 2>&1; then
+  SHA=$(sha256sum target/wasm32-wasip1/debug/sqlc-gen-sqlx.wasm | awk '{print $1}')
+else
+  SHA=$(shasum -a 256 target/wasm32-wasip1/debug/sqlc-gen-sqlx.wasm | awk '{print $1}')
+fi
+# Update sqlc.yaml in-place with the freshly computed sha256
+sed -i.bak "s|sha256:.*|sha256: \\\"${SHA}\\\"|" sqlc.yaml && rm -f sqlc.yaml.bak
+sqlc generate
+cargo fmt --all
+"""
