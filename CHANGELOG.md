@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.1.4...v0.1.5) (2026-04-14)
+
+
+### Features
+
+* Derive Copy and Clone on Queries ([#11](https://github.com/mathematic-inc/sqlc-gen-sqlx/issues/11)) ([c33d55f](https://github.com/mathematic-inc/sqlc-gen-sqlx/commit/c33d55fa526d22b7551d5b858cec51023d7359f9))
+
 ## [0.1.4](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.1.3...v0.1.4) (2026-04-13)
 
 
