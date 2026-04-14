@@ -92,6 +92,7 @@ pub fn generate(request: &GenerateRequestView<'_>, config: &Config) -> Result<St
             }
         }
 
+        #[derive(Copy, Clone)]
         pub struct Queries<E> {
             db: E,
         }
