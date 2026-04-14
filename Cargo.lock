@@ -2287,7 +2287,7 @@ dependencies = [
 
 [[package]]
 name = "sqlc-gen-sqlx"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "buffa",
  "convert_case",
