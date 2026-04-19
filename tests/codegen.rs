@@ -92,7 +92,7 @@ fn snapshot_one() {
     let code = String::from_utf8(resp.files[0].contents.clone()).unwrap();
     assert_codegen_snapshot("one", &code);
     assert!(
-        code.contains("#![allow(dead_code, reason = \"generated queries may expose items a caller does not use\")]"),
+        code.contains("#![allow(\n    dead_code,\n    reason = \"generated queries may expose items a caller does not use\"\n)]"),
         "expected dead_code allow in:\n{code}"
     );
     assert!(
