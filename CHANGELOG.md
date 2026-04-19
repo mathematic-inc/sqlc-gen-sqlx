@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.6](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.1.5...v0.1.6) (2026-04-19)
+
+
+### Bug Fixes
+
+* Emit rustfmt-compliant #![allow] header ([#13](https://github.com/mathematic-inc/sqlc-gen-sqlx/issues/13)) ([04acf9a](https://github.com/mathematic-inc/sqlc-gen-sqlx/commit/04acf9ada1b67c9de37489dc894fff6fc773b301))
+
 ## [0.1.5](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.1.4...v0.1.5) (2026-04-14)
 
 
