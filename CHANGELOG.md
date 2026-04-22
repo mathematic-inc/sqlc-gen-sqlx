@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.7](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.1.6...v0.1.7) (2026-04-22)
+
+
+### Bug Fixes
+
+* Omit trailing next_placeholder increment after last param ([#15](https://github.com/mathematic-inc/sqlc-gen-sqlx/issues/15)) ([6bb1b7e](https://github.com/mathematic-inc/sqlc-gen-sqlx/commit/6bb1b7e75ca835bc79f98e855a9ca7293f12a6c4))
+
 ## [0.1.6](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.1.5...v0.1.6) (2026-04-19)
 
 
