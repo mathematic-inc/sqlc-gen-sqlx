@@ -65,7 +65,7 @@ impl<E: AsExecutor> Queries<E> {
         ids: Vec<i64>,
     ) -> Result<Vec<ListAuthorsByDynamicIdsRow>, sqlx::Error> {
         let mut sql = LIST_AUTHORS_BY_DYNAMIC_IDS.to_string();
-        let mut next_placeholder = 1usize;
+        let next_placeholder = 1usize;
         let placeholder_1 = next_placeholder;
         let slice_len = (ids).len();
         let replacement = if slice_len == 0 {
@@ -85,7 +85,6 @@ impl<E: AsExecutor> Queries<E> {
                 sql = sql.replace("$1", &replacement);
             }
         }
-        next_placeholder += slice_len;
         let mut query = sqlx::query_as::<_, ListAuthorsByDynamicIdsRow>(&sql);
         for value in ids {
             query = query.bind(value);

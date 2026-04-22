@@ -193,11 +193,19 @@ pub(crate) fn dynamic_sql_setup(
         });
     }
 
-    tokens.push(quote! {
-        let mut next_placeholder = 1usize;
-    });
-
-    for param in ordered_params(params) {
+    let ordered = ordered_params(params);
+    if ordered.len() > 1 {
+        tokens.push(quote! {
+            let mut next_placeholder = 1usize;
+        });
+    } else if ordered.len() == 1 {
+        tokens.push(quote! {
+            let next_placeholder = 1usize;
+        });
+    }
+    let last_idx = ordered.len().saturating_sub(1);
+    for (idx, param) in ordered.iter().enumerate() {
+        let is_last = idx == last_idx;
         let placeholder_ident = format_ident!("placeholder_{}", param.number as usize);
         tokens.push(quote! {
             let #placeholder_ident = next_placeholder;
@@ -208,6 +216,11 @@ pub(crate) fn dynamic_sql_setup(
             let marker = format!("/*SLICE:{}*/?", param.source_name);
             let numbered_marker = format!("/*SLICE:{}*/${}", param.source_name, param.number);
             let bare_placeholder = format!("${}", param.number);
+            let advance = if is_last {
+                quote! {}
+            } else {
+                quote! { next_placeholder += slice_len; }
+            };
             tokens.push(quote! {
                 let slice_len = (#value_expr).len();
                 let replacement = if slice_len == 0 {
@@ -227,13 +240,18 @@ pub(crate) fn dynamic_sql_setup(
                         sql = sql.replace(#bare_placeholder, &replacement);
                     }
                 }
-                next_placeholder += slice_len;
+                #advance
             });
         } else {
             let temporary = format!("__SQLC_PARAM_{}__", param.number);
+            let advance = if is_last {
+                quote! {}
+            } else {
+                quote! { next_placeholder += 1; }
+            };
             tokens.push(quote! {
                 sql = sql.replace(#temporary, &format!("${}", #placeholder_ident));
-                next_placeholder += 1;
+                #advance
             });
         }
     }
