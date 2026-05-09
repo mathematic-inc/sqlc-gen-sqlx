@@ -10,12 +10,6 @@ expression: code
     reason = "generated queries may expose items a caller does not use"
 )]
 
-#[derive(Debug, Clone)]
-pub struct UpdateAuthorNamedParamsParams {
-    pub set_name: String,
-    pub author_id: i64,
-}
-const UPDATE_AUTHOR_NAMED_PARAMS: &str = "UPDATE authors SET name = $1 WHERE id = $2";
 pub trait AsExecutor {
     fn as_executor(&mut self) -> impl sqlx::Executor<'_, Database = sqlx::Postgres>;
 }
@@ -49,28 +43,20 @@ impl<T: AsExecutor + ?Sized> AsExecutor for &mut T {
         (**self).as_executor()
     }
 }
-#[derive(Copy, Clone)]
-pub struct Queries<E> {
-    db: E,
+#[derive(Debug, Clone)]
+pub struct UpdateAuthorNamedParamsParams {
+    pub set_name: String,
+    pub author_id: i64,
 }
-impl<E> Queries<E> {
-    pub fn new(db: E) -> Self {
-        Self { db }
-    }
-    pub fn into_inner(self) -> E {
-        self.db
-    }
-}
-impl<E: AsExecutor> Queries<E> {
-    pub async fn update_author_named_params(
-        &mut self,
-        arg: UpdateAuthorNamedParamsParams,
-    ) -> Result<(), sqlx::Error> {
-        sqlx::query(UPDATE_AUTHOR_NAMED_PARAMS)
-            .bind(arg.set_name)
-            .bind(arg.author_id)
-            .execute(self.db.as_executor())
-            .await?;
-        Ok(())
-    }
+const UPDATE_AUTHOR_NAMED_PARAMS: &str = "UPDATE authors SET name = $1 WHERE id = $2";
+pub async fn update_author_named_params<E: AsExecutor>(
+    mut db: E,
+    arg: UpdateAuthorNamedParamsParams,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(UPDATE_AUTHOR_NAMED_PARAMS)
+        .bind(arg.set_name)
+        .bind(arg.author_id)
+        .execute(db.as_executor())
+        .await?;
+    Ok(())
 }

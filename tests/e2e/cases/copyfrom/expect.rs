@@ -3,7 +3,7 @@ use sqlx::{Connection as _, PgConnection};
 #[path = "../src/queries.rs"]
 mod queries;
 
-use queries::{CopyAuthorsParams, Queries};
+use queries::CopyAuthorsParams;
 
 #[tokio::test]
 async fn copyfrom_inserts_every_item() -> Result<(), Box<dyn std::error::Error>> {
@@ -24,9 +24,9 @@ async fn copyfrom_inserts_every_item() -> Result<(), Box<dyn std::error::Error>>
         .execute(&mut conn)
         .await?;
 
-    let mut q = Queries::new(conn);
-    let inserted = q
-        .copy_authors([
+    let inserted = queries::copy_authors(
+        &mut conn,
+        [
             CopyAuthorsParams {
                 name: "Bob".to_string(),
                 bio: Some("Rustacean".to_string()),
@@ -35,8 +35,9 @@ async fn copyfrom_inserts_every_item() -> Result<(), Box<dyn std::error::Error>>
                 name: "Cara".to_string(),
                 bio: Some("SQL fan".to_string()),
             },
-        ])
-        .await?;
+        ],
+    )
+    .await?;
 
     assert_eq!(inserted, 2);
 

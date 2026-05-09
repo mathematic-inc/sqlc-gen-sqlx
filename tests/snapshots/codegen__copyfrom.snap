@@ -10,13 +10,6 @@ expression: code
     reason = "generated queries may expose items a caller does not use"
 )]
 
-#[derive(Debug, Clone)]
-pub struct CopyAuthorsParams {
-    pub name: String,
-    pub bio: Option<String>,
-}
-const COPY_AUTHORS: &str = "INSERT INTO authors (name, bio) ";
-const COPY_AUTHORS_BATCH_SIZE: usize = 32767usize;
 pub trait AsExecutor {
     fn as_executor(&mut self) -> impl sqlx::Executor<'_, Database = sqlx::Postgres>;
 }
@@ -50,48 +43,38 @@ impl<T: AsExecutor + ?Sized> AsExecutor for &mut T {
         (**self).as_executor()
     }
 }
-#[derive(Copy, Clone)]
-pub struct Queries<E> {
-    db: E,
+#[derive(Debug, Clone)]
+pub struct CopyAuthorsParams {
+    pub name: String,
+    pub bio: Option<String>,
 }
-impl<E> Queries<E> {
-    pub fn new(db: E) -> Self {
-        Self { db }
-    }
-    pub fn into_inner(self) -> E {
-        self.db
-    }
-}
-impl<E: AsExecutor> Queries<E> {
-    pub async fn copy_authors<I>(&mut self, items: I) -> Result<u64, sqlx::Error>
-    where
-        I: IntoIterator<Item = CopyAuthorsParams>,
-    {
-        let mut rows_affected = 0u64;
-        let mut items = items.into_iter();
-        loop {
-            let chunk = items.by_ref().take(COPY_AUTHORS_BATCH_SIZE).collect::<Vec<_>>();
-            if chunk.is_empty() {
-                break;
-            }
-            let mut query_builder = sqlx::QueryBuilder::<
-                sqlx::Postgres,
-            >::new(COPY_AUTHORS);
-            query_builder
-                .push_values(
-                    chunk,
-                    |mut b, item| {
-                        b.push_bind(item.name);
-                        b.push_bind(item.bio);
-                    },
-                );
-            rows_affected
-                += query_builder
-                    .build()
-                    .execute(self.db.as_executor())
-                    .await?
-                    .rows_affected();
+const COPY_AUTHORS: &str = "INSERT INTO authors (name, bio) ";
+const COPY_AUTHORS_BATCH_SIZE: usize = 32767usize;
+pub async fn copy_authors<E: AsExecutor, I>(
+    mut db: E,
+    items: I,
+) -> Result<u64, sqlx::Error>
+where
+    I: IntoIterator<Item = CopyAuthorsParams>,
+{
+    let mut rows_affected = 0u64;
+    let mut items = items.into_iter();
+    loop {
+        let chunk = items.by_ref().take(COPY_AUTHORS_BATCH_SIZE).collect::<Vec<_>>();
+        if chunk.is_empty() {
+            break;
         }
-        Ok(rows_affected)
+        let mut query_builder = sqlx::QueryBuilder::<sqlx::Postgres>::new(COPY_AUTHORS);
+        query_builder
+            .push_values(
+                chunk,
+                |mut b, item| {
+                    b.push_bind(item.name);
+                    b.push_bind(item.bio);
+                },
+            );
+        rows_affected
+            += query_builder.build().execute(db.as_executor()).await?.rows_affected();
     }
+    Ok(rows_affected)
 }

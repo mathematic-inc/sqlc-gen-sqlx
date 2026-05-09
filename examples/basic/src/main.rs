@@ -5,7 +5,7 @@ use sqlx::{Connection as _, PgConnection};
 #[cfg(test)]
 mod queries;
 #[cfg(test)]
-use queries::{CreateAuthorParams, Queries};
+use queries::CreateAuthorParams;
 
 #[cfg(test)]
 #[tokio::test]
@@ -24,24 +24,28 @@ async fn test_author_roundtrip() {
         .await
         .unwrap();
 
-    let mut q = Queries::new(conn);
-
-    let author = q
-        .create_author(CreateAuthorParams {
+    let author = queries::create_author(
+        &mut conn,
+        CreateAuthorParams {
             name: "Alice".to_string(),
             bio: Some("Loves Rust".to_string()),
-        })
-        .await
-        .expect("create");
+        },
+    )
+    .await
+    .expect("create");
     assert_eq!(author.name, "Alice");
 
-    let fetched = q.get_author(author.id).await.expect("get");
+    let fetched = queries::get_author(&mut conn, author.id)
+        .await
+        .expect("get");
     assert_eq!(fetched.bio, Some("Loves Rust".to_string()));
 
-    let all = q.list_authors().await.expect("list");
+    let all = queries::list_authors(&mut conn).await.expect("list");
     assert!(!all.is_empty());
 
-    let rows = q.delete_author_rows(author.id).await.expect("delete");
+    let rows = queries::delete_author_rows(&mut conn, author.id)
+        .await
+        .expect("delete");
     assert_eq!(rows, 1);
 }
 

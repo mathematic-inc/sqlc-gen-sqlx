@@ -10,7 +10,6 @@ expression: code
     reason = "generated queries may expose items a caller does not use"
 )]
 
-const CREATE_AUTHOR: &str = "INSERT INTO authors (name) VALUES ($1) RETURNING id";
 pub trait AsExecutor {
     fn as_executor(&mut self) -> impl sqlx::Executor<'_, Database = sqlx::Postgres>;
 }
@@ -44,24 +43,14 @@ impl<T: AsExecutor + ?Sized> AsExecutor for &mut T {
         (**self).as_executor()
     }
 }
-#[derive(Copy, Clone)]
-pub struct Queries<E> {
-    db: E,
-}
-impl<E> Queries<E> {
-    pub fn new(db: E) -> Self {
-        Self { db }
-    }
-    pub fn into_inner(self) -> E {
-        self.db
-    }
-}
-impl<E: AsExecutor> Queries<E> {
-    pub async fn create_author(&mut self, name: String) -> Result<i64, sqlx::Error> {
-        let (_row,): (i64,) = sqlx::query_as(CREATE_AUTHOR)
-            .bind(name)
-            .fetch_one(self.db.as_executor())
-            .await?;
-        Ok(_row)
-    }
+const CREATE_AUTHOR: &str = "INSERT INTO authors (name) VALUES ($1) RETURNING id";
+pub async fn create_author<E: AsExecutor>(
+    mut db: E,
+    name: String,
+) -> Result<i64, sqlx::Error> {
+    let (_row,): (i64,) = sqlx::query_as(CREATE_AUTHOR)
+        .bind(name)
+        .fetch_one(db.as_executor())
+        .await?;
+    Ok(_row)
 }

@@ -3,8 +3,6 @@ use sqlx::{Connection as _, PgConnection};
 #[path = "../src/queries.rs"]
 mod queries;
 
-use queries::Queries;
-
 #[tokio::test]
 async fn list_authors_by_ids_expands_dynamic_slice() -> Result<(), Box<dyn std::error::Error>> {
     let db_url = std::env::var("DATABASE_URL")?;
@@ -33,8 +31,7 @@ async fn list_authors_by_ids_expands_dynamic_slice() -> Result<(), Box<dyn std::
     .execute(&mut conn)
     .await?;
 
-    let mut q = Queries::new(conn);
-    let authors = q.list_authors_by_ids(vec![1, 3]).await?;
+    let authors = queries::list_authors_by_ids(&mut conn, vec![1, 3]).await?;
     let names = authors
         .iter()
         .map(|author| author.name.as_str())

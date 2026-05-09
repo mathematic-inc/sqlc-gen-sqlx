@@ -15,42 +15,7 @@ pub fn generate(request: &GenerateRequestView<'_>, config: &Config) -> Result<St
     let col_overrides = crate::types::build_column_overrides(&config.overrides);
     let mut emitter = FileEmitter::new(request.sqlc_version, env!("CARGO_PKG_VERSION"));
 
-    // Emit type definitions before query code.
-    for info in &catalog_info.enums {
-        emitter.push(enums::gen_enum(info, &config.enum_derives)?);
-    }
-    for info in &catalog_info.composites {
-        emitter.push(composites::gen_composite(info, &config.composite_derives)?);
-    }
-
-    let mut module_items: Vec<proc_macro2::TokenStream> = Vec::new();
-    let mut impl_fns: Vec<proc_macro2::TokenStream> = Vec::new();
-
-    for q in request.queries.iter() {
-        let (outer, inner) = match q.cmd {
-            ":exec" => query::gen_exec(q, &type_map, config, &col_overrides)?,
-            ":execrows" => query::gen_execrows(q, &type_map, config, &col_overrides)?,
-            ":execresult" => query::gen_execresult(q, &type_map, config, &col_overrides)?,
-            ":execlastid" => query::gen_execlastid(q, &type_map, config, &col_overrides)?,
-            ":batchexec" => batch::gen_batchexec(q, &type_map, config, &col_overrides)?,
-            ":batchone" => batch::gen_batchone(q, &type_map, config, &col_overrides)?,
-            ":batchmany" => batch::gen_batchmany(q, &type_map, config, &col_overrides)?,
-            ":copyfrom" => copyfrom::gen_copyfrom(q, &type_map, config, &col_overrides)?,
-            ":one" => query::gen_one(q, &type_map, config, &col_overrides)?,
-            ":many" => query::gen_many(q, &type_map, config, &col_overrides)?,
-            cmd => {
-                eprintln!("sqlc-gen-sqlx: skipping unsupported annotation {cmd}");
-                continue;
-            }
-        };
-        module_items.push(outer);
-        impl_fns.push(inner);
-    }
-
-    for item in module_items {
-        emitter.push(item);
-    }
-
+    // Emit the AsExecutor trait + impls up front so query functions can reference it.
     emitter.push(quote::quote! {
         pub trait AsExecutor {
             fn as_executor(&mut self) -> impl sqlx::Executor<'_, Database = sqlx::Postgres>;
@@ -91,29 +56,34 @@ pub fn generate(request: &GenerateRequestView<'_>, config: &Config) -> Result<St
                 (**self).as_executor()
             }
         }
-
-        #[derive(Copy, Clone)]
-        pub struct Queries<E> {
-            db: E,
-        }
-
-        impl<E> Queries<E> {
-            pub fn new(db: E) -> Self {
-                Self { db }
-            }
-
-            pub fn into_inner(self) -> E {
-                self.db
-            }
-        }
     });
 
-    if !impl_fns.is_empty() {
-        emitter.push(quote::quote! {
-            impl<E: AsExecutor> Queries<E> {
-                #(#impl_fns)*
+    // Emit type definitions before query code.
+    for info in &catalog_info.enums {
+        emitter.push(enums::gen_enum(info, &config.enum_derives)?);
+    }
+    for info in &catalog_info.composites {
+        emitter.push(composites::gen_composite(info, &config.composite_derives)?);
+    }
+
+    for q in request.queries.iter() {
+        let tokens = match q.cmd {
+            ":exec" => query::gen_exec(q, &type_map, config, &col_overrides)?,
+            ":execrows" => query::gen_execrows(q, &type_map, config, &col_overrides)?,
+            ":execresult" => query::gen_execresult(q, &type_map, config, &col_overrides)?,
+            ":execlastid" => query::gen_execlastid(q, &type_map, config, &col_overrides)?,
+            ":batchexec" => batch::gen_batchexec(q, &type_map, config, &col_overrides)?,
+            ":batchone" => batch::gen_batchone(q, &type_map, config, &col_overrides)?,
+            ":batchmany" => batch::gen_batchmany(q, &type_map, config, &col_overrides)?,
+            ":copyfrom" => copyfrom::gen_copyfrom(q, &type_map, config, &col_overrides)?,
+            ":one" => query::gen_one(q, &type_map, config, &col_overrides)?,
+            ":many" => query::gen_many(q, &type_map, config, &col_overrides)?,
+            cmd => {
+                eprintln!("sqlc-gen-sqlx: skipping unsupported annotation {cmd}");
+                continue;
             }
-        });
+        };
+        emitter.push(tokens);
     }
 
     emitter.finish()

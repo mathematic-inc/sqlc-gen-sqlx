@@ -17,7 +17,7 @@ pub fn gen_copyfrom(
     type_map: &TypeMap,
     config: &Config,
     col_overrides: &std::collections::HashMap<String, ResolvedType>,
-) -> Result<(TokenStream, TokenStream), Error> {
+) -> Result<TokenStream, Error> {
     let params = resolve_params(query.params.iter(), type_map, col_overrides)?;
     if params.is_empty() {
         return Err(Error::Codegen(format!(
@@ -49,8 +49,8 @@ pub fn gen_copyfrom(
         (None, quote! { #ty }, push_bind_calls(&params, None))
     };
 
-    let inner = quote! {
-        pub async fn #fn_name<I>(&mut self, items: I) -> Result<u64, sqlx::Error>
+    let fn_tokens = quote! {
+        pub async fn #fn_name<E: AsExecutor, I>(mut db: E, items: I) -> Result<u64, sqlx::Error>
         where
             I: IntoIterator<Item = #items_ty>,
         {
@@ -68,21 +68,19 @@ pub fn gen_copyfrom(
                     #builder_binds
                 });
 
-                rows_affected += query_builder.build().execute(self.db.as_executor()).await?.rows_affected();
+                rows_affected += query_builder.build().execute(db.as_executor()).await?.rows_affected();
             }
 
             Ok(rows_affected)
         }
     };
 
-    Ok((
-        quote! {
-            #params_struct
-            #const_tokens
-            const #batch_size_name: usize = #batch_size;
-        },
-        inner,
-    ))
+    Ok(quote! {
+        #params_struct
+        #const_tokens
+        const #batch_size_name: usize = #batch_size;
+        #fn_tokens
+    })
 }
 
 fn insert_prefix(sql: &str) -> Result<String, Error> {
