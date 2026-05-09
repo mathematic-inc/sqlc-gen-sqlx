@@ -4,8 +4,6 @@ use sqlx::{Connection as _, PgConnection};
 #[path = "../src/queries.rs"]
 mod queries;
 
-use queries::Queries;
-
 #[tokio::test]
 async fn batchexec_streams_one_result_per_input() -> Result<(), Box<dyn std::error::Error>> {
     let db_url = std::env::var("DATABASE_URL")?;
@@ -34,9 +32,7 @@ async fn batchexec_streams_one_result_per_input() -> Result<(), Box<dyn std::err
     .execute(&mut conn)
     .await?;
 
-    let mut q = Queries::new(conn);
-    let deleted = q
-        .batch_delete_author([1_i64, 2, 3])
+    let deleted = queries::batch_delete_author(&mut conn, [1_i64, 2, 3])
         .try_collect::<Vec<_>>()
         .await?;
 

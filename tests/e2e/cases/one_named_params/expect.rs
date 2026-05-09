@@ -3,7 +3,7 @@ use sqlx::{Connection as _, PgConnection};
 #[path = "../src/queries.rs"]
 mod queries;
 
-use queries::{CreateAuthorParams, Queries};
+use queries::CreateAuthorParams;
 
 #[tokio::test]
 async fn create_author_uses_named_params() -> Result<(), Box<dyn std::error::Error>> {
@@ -24,13 +24,14 @@ async fn create_author_uses_named_params() -> Result<(), Box<dyn std::error::Err
         .execute(&mut conn)
         .await?;
 
-    let mut q = Queries::new(conn);
-    let author = q
-        .create_author(CreateAuthorParams {
+    let author = queries::create_author(
+        &mut conn,
+        CreateAuthorParams {
             name: "Alice".to_string(),
             bio: Some("Rust enthusiast".to_string()),
-        })
-        .await?;
+        },
+    )
+    .await?;
 
     assert_eq!(author.id, 1);
     assert_eq!(author.name, "Alice");

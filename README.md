@@ -9,24 +9,21 @@ For each SQL query annotated with a sqlc command, the plugin emits:
 - A `const SQL: &str` holding the query text.
 - A strongly-typed row struct (`QueryNameRow`) for `:one` / `:many`.
 - An optional params struct (`QueryNameParams`) when a query has 2+ parameters.
-- A `&mut self` method on `pub struct Queries<E>` that executes the query.
+- A free `pub async fn` (or `pub fn` for batch streams) that executes the query, taking the executor as its first argument.
 
-`Queries<E>` wraps anything implementing the generated `AsExecutor` trait. `AsExecutor` is implemented for `PgPool`, `&PgPool`, `PgConnection`, `Transaction<'_, Postgres>`, `PoolConnection<Postgres>`, and `&mut T` of each:
+The executor argument is generic over the `AsExecutor` trait emitted in the same file. `AsExecutor` is implemented for `&PgPool`, `&mut PgConnection`, `&mut Transaction<'_, Postgres>`, `&mut PoolConnection<Postgres>`, and `&mut T` of each — i.e. the natural sqlx reference types:
 
 ```rust
 // From a pool:
-let mut q = Queries::new(&pool);
-let author = q.get_author(1).await?;
+let author = queries::get_author(&pool, 1).await?;
 
-// Borrowed or owned pool connection:
+// Pool connection:
 let mut conn = pool.acquire().await?;
-let mut q = Queries::new(&mut conn);
-// ...or Queries::new(conn) to take ownership.
+let author = queries::get_author(&mut conn, 1).await?;
 
-// Transactions:
+// Transaction:
 let mut tx = pool.begin().await?;
-let mut q = Queries::new(&mut tx);
-q.delete_author(1).await?;
+queries::delete_author(&mut tx, 1).await?;
 tx.commit().await?;
 ```
 
@@ -132,7 +129,7 @@ Array types (`type[]`) become `Vec<T>`. Nullable columns become `Option<T>`.
 | `:batchmany` | `impl Stream<Item = Result<Vec<QueryRow>, sqlx::Error>>` | Lazily fetch all rows per item |
 | `:copyfrom` | `Result<u64, sqlx::Error>` | Chunked bulk insert from any `IntoIterator` |
 
-All functions are `&mut self` methods on `Queries<E>`. The bound is `E: AsExecutor`, where `AsExecutor` is the trait emitted in each generated file. Impls cover `PgPool`, `&PgPool`, `PgConnection`, `Transaction<'_, Postgres>`, `PoolConnection<Postgres>`, and `&mut T` of each.
+All functions are free `pub async fn` (or `pub fn` for batch streams) at module scope, taking the executor as their first argument. The bound is `E: AsExecutor`, where `AsExecutor` is the trait emitted in each generated file. Impls cover `&PgPool`, `&mut PgConnection`, `&mut Transaction<'_, Postgres>`, `&mut PoolConnection<Postgres>`, and `&mut T` of each.
 
 Batch methods generate `Stream`-returning APIs and reference `futures_core` and `futures_util` directly. Consumer crates should include those dependencies alongside `sqlx`.
 

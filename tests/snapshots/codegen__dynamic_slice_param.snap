@@ -10,13 +10,6 @@ expression: code
     reason = "generated queries may expose items a caller does not use"
 )]
 
-const LIST_AUTHORS_BY_DYNAMIC_IDS: &str = "SELECT id, name, bio FROM authors WHERE id IN ($1)";
-#[derive(Debug, Clone, sqlx::FromRow)]
-pub struct ListAuthorsByDynamicIdsRow {
-    pub id: i64,
-    pub name: String,
-    pub bio: Option<String>,
-}
 pub trait AsExecutor {
     fn as_executor(&mut self) -> impl sqlx::Executor<'_, Database = sqlx::Postgres>;
 }
@@ -50,48 +43,41 @@ impl<T: AsExecutor + ?Sized> AsExecutor for &mut T {
         (**self).as_executor()
     }
 }
-#[derive(Copy, Clone)]
-pub struct Queries<E> {
-    db: E,
+const LIST_AUTHORS_BY_DYNAMIC_IDS: &str = "SELECT id, name, bio FROM authors WHERE id IN ($1)";
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct ListAuthorsByDynamicIdsRow {
+    pub id: i64,
+    pub name: String,
+    pub bio: Option<String>,
 }
-impl<E> Queries<E> {
-    pub fn new(db: E) -> Self {
-        Self { db }
-    }
-    pub fn into_inner(self) -> E {
-        self.db
-    }
-}
-impl<E: AsExecutor> Queries<E> {
-    pub async fn list_authors_by_dynamic_ids(
-        &mut self,
-        ids: Vec<i64>,
-    ) -> Result<Vec<ListAuthorsByDynamicIdsRow>, sqlx::Error> {
-        let mut sql = LIST_AUTHORS_BY_DYNAMIC_IDS.to_string();
-        let next_placeholder = 1usize;
-        let placeholder_1 = next_placeholder;
-        let slice_len = (ids).len();
-        let replacement = if slice_len == 0 {
-            "NULL".to_string()
+pub async fn list_authors_by_dynamic_ids<E: AsExecutor>(
+    mut db: E,
+    ids: Vec<i64>,
+) -> Result<Vec<ListAuthorsByDynamicIdsRow>, sqlx::Error> {
+    let mut sql = LIST_AUTHORS_BY_DYNAMIC_IDS.to_string();
+    let next_placeholder = 1usize;
+    let placeholder_1 = next_placeholder;
+    let slice_len = (ids).len();
+    let replacement = if slice_len == 0 {
+        "NULL".to_string()
+    } else {
+        (placeholder_1..(placeholder_1 + slice_len))
+            .map(|n| format!("${}", n))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    if sql.contains("/*SLICE:ids*/?") {
+        sql = sql.replace("/*SLICE:ids*/?", &replacement);
+    } else {
+        if sql.contains("/*SLICE:ids*/$1") {
+            sql = sql.replace("/*SLICE:ids*/$1", &replacement);
         } else {
-            (placeholder_1..(placeholder_1 + slice_len))
-                .map(|n| format!("${}", n))
-                .collect::<Vec<_>>()
-                .join(", ")
-        };
-        if sql.contains("/*SLICE:ids*/?") {
-            sql = sql.replace("/*SLICE:ids*/?", &replacement);
-        } else {
-            if sql.contains("/*SLICE:ids*/$1") {
-                sql = sql.replace("/*SLICE:ids*/$1", &replacement);
-            } else {
-                sql = sql.replace("$1", &replacement);
-            }
+            sql = sql.replace("$1", &replacement);
         }
-        let mut query = sqlx::query_as::<_, ListAuthorsByDynamicIdsRow>(&sql);
-        for value in ids {
-            query = query.bind(value);
-        }
-        query.fetch_all(self.db.as_executor()).await
     }
+    let mut query = sqlx::query_as::<_, ListAuthorsByDynamicIdsRow>(&sql);
+    for value in ids {
+        query = query.bind(value);
+    }
+    query.fetch_all(db.as_executor()).await
 }

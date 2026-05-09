@@ -10,13 +10,6 @@ expression: code
     reason = "generated queries may expose items a caller does not use"
 )]
 
-const BATCH_LIST_AUTHORS: &str = "SELECT id, name, bio FROM authors WHERE bio LIKE $1";
-#[derive(Debug, Clone, sqlx::FromRow)]
-pub struct BatchListAuthorsRow {
-    pub id: i64,
-    pub name: String,
-    pub bio: Option<String>,
-}
 pub trait AsExecutor {
     fn as_executor(&mut self) -> impl sqlx::Executor<'_, Database = sqlx::Postgres>;
 }
@@ -50,42 +43,35 @@ impl<T: AsExecutor + ?Sized> AsExecutor for &mut T {
         (**self).as_executor()
     }
 }
-#[derive(Copy, Clone)]
-pub struct Queries<E> {
+const BATCH_LIST_AUTHORS: &str = "SELECT id, name, bio FROM authors WHERE bio LIKE $1";
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct BatchListAuthorsRow {
+    pub id: i64,
+    pub name: String,
+    pub bio: Option<String>,
+}
+pub fn batch_list_authors<'a, E, I>(
     db: E,
-}
-impl<E> Queries<E> {
-    pub fn new(db: E) -> Self {
-        Self { db }
-    }
-    pub fn into_inner(self) -> E {
-        self.db
-    }
-}
-impl<E: AsExecutor> Queries<E> {
-    pub fn batch_list_authors<'a, I>(
-        &'a mut self,
-        items: I,
-    ) -> impl futures_core::stream::Stream<
-        Item = Result<Vec<BatchListAuthorsRow>, sqlx::Error>,
-    > + 'a
-    where
-        I: IntoIterator<Item = Option<String>> + 'a,
-        I::IntoIter: 'a,
-        E: 'a,
-    {
-        futures_util::stream::try_unfold(
-            (&mut self.db, items.into_iter()),
-            |(db, mut items)| async move {
-                let Some(item) = items.next() else {
-                    return Ok(None);
-                };
-                let rows = sqlx::query_as::<_, BatchListAuthorsRow>(BATCH_LIST_AUTHORS)
-                    .bind(item)
-                    .fetch_all(db.as_executor())
-                    .await?;
-                Ok(Some((rows, (db, items))))
-            },
-        )
-    }
+    items: I,
+) -> impl futures_core::stream::Stream<
+    Item = Result<Vec<BatchListAuthorsRow>, sqlx::Error>,
+> + 'a
+where
+    E: AsExecutor + 'a,
+    I: IntoIterator<Item = Option<String>> + 'a,
+    I::IntoIter: 'a,
+{
+    futures_util::stream::try_unfold(
+        (db, items.into_iter()),
+        |(mut db, mut items)| async move {
+            let Some(item) = items.next() else {
+                return Ok(None);
+            };
+            let rows = sqlx::query_as::<_, BatchListAuthorsRow>(BATCH_LIST_AUTHORS)
+                .bind(item)
+                .fetch_all(db.as_executor())
+                .await?;
+            Ok(Some((rows, (db, items))))
+        },
+    )
 }

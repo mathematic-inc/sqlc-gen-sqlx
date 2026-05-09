@@ -47,18 +47,18 @@ fn batch_stream_method(
     next_body: TokenStream,
 ) -> TokenStream {
     quote! {
-        pub fn #fn_name<'a, I>(
-            &'a mut self,
+        pub fn #fn_name<'a, E, I>(
+            db: E,
             items: I,
         ) -> impl futures_core::stream::Stream<Item = Result<#result_ty, sqlx::Error>> + 'a
         where
+            E: AsExecutor + 'a,
             I: IntoIterator<Item = #items_ty> + 'a,
             I::IntoIter: 'a,
-            E: 'a,
         {
             futures_util::stream::try_unfold(
-                (&mut self.db, items.into_iter()),
-                |(db, mut items)| async move {
+                (db, items.into_iter()),
+                |(mut db, mut items)| async move {
                     let Some(item) = items.next() else {
                         return Ok(None);
                     };
@@ -76,7 +76,7 @@ pub fn gen_batchexec(
     type_map: &TypeMap,
     config: &Config,
     col_overrides: &std::collections::HashMap<String, ResolvedType>,
-) -> Result<(TokenStream, TokenStream), Error> {
+) -> Result<TokenStream, Error> {
     let params = resolve_params(query.params.iter(), type_map, col_overrides)?;
     if params.is_empty() {
         return Err(Error::Codegen(format!(
@@ -124,7 +124,7 @@ pub fn gen_batchexec(
     };
 
     let method = batch_stream_method(&fn_name, &items_ty, &quote! { () }, next_body);
-    Ok((quote! { #params_struct #const_tokens }, method))
+    Ok(quote! { #params_struct #const_tokens #method })
 }
 
 /// `:batchone` → `fn foo(items) -> impl Stream<Item = Result<Row, Error>>`
@@ -133,7 +133,7 @@ pub fn gen_batchone(
     type_map: &TypeMap,
     config: &Config,
     col_overrides: &std::collections::HashMap<String, ResolvedType>,
-) -> Result<(TokenStream, TokenStream), Error> {
+) -> Result<TokenStream, Error> {
     let params = resolve_params(query.params.iter(), type_map, col_overrides)?;
     if params.is_empty() {
         return Err(Error::Codegen(format!(
@@ -184,7 +184,7 @@ pub fn gen_batchone(
     };
 
     let method = batch_stream_method(&fn_name, &items_ty, &quote! { #row_name }, next_body);
-    Ok((quote! { #params_struct #const_tokens #row_tokens }, method))
+    Ok(quote! { #params_struct #const_tokens #row_tokens #method })
 }
 
 /// `:batchmany` → `fn foo(items) -> impl Stream<Item = Result<Vec<Row>, Error>>`
@@ -193,7 +193,7 @@ pub fn gen_batchmany(
     type_map: &TypeMap,
     config: &Config,
     col_overrides: &std::collections::HashMap<String, ResolvedType>,
-) -> Result<(TokenStream, TokenStream), Error> {
+) -> Result<TokenStream, Error> {
     let params = resolve_params(query.params.iter(), type_map, col_overrides)?;
     if params.is_empty() {
         return Err(Error::Codegen(format!(
@@ -244,5 +244,5 @@ pub fn gen_batchmany(
     };
 
     let method = batch_stream_method(&fn_name, &items_ty, &quote! { Vec<#row_name> }, next_body);
-    Ok((quote! { #params_struct #const_tokens #row_tokens }, method))
+    Ok(quote! { #params_struct #const_tokens #row_tokens #method })
 }

@@ -96,8 +96,16 @@ fn snapshot_one() {
         "expected dead_code allow in:\n{code}"
     );
     assert!(
-        code.contains("Queries<E>"),
-        "expected Queries<E> in:\n{code}"
+        code.contains("pub async fn get_author<E: AsExecutor>"),
+        "expected free function get_author<E: AsExecutor> in:\n{code}"
+    );
+    assert!(
+        code.contains("mut db: E"),
+        "expected mut db: E parameter in:\n{code}"
+    );
+    assert!(
+        !code.contains("Queries<E>"),
+        "Queries<E> wrapper should be gone in:\n{code}"
     );
 }
 
@@ -120,8 +128,12 @@ fn snapshot_many() {
     let code = String::from_utf8(resp.files[0].contents.clone()).unwrap();
     assert_codegen_snapshot("many", &code);
     assert!(
-        code.contains("Queries<E>"),
-        "expected Queries<E> in:\n{code}"
+        code.contains("pub async fn list_authors<E: AsExecutor>"),
+        "expected free function list_authors<E: AsExecutor> in:\n{code}"
+    );
+    assert!(
+        !code.contains("Queries<E>"),
+        "Queries<E> wrapper should be gone in:\n{code}"
     );
 }
 
@@ -146,8 +158,12 @@ fn snapshot_exec() {
 
     assert_codegen_snapshot("exec", &code);
     assert!(
-        code.contains("Queries<E>"),
-        "expected Queries<E> in:\n{code}"
+        code.contains("pub async fn delete_author<E: AsExecutor>"),
+        "expected free function delete_author<E: AsExecutor> in:\n{code}"
+    );
+    assert!(
+        !code.contains("Queries<E>"),
+        "Queries<E> wrapper should be gone in:\n{code}"
     );
 }
 
@@ -170,8 +186,12 @@ fn snapshot_execrows() {
     let code = String::from_utf8(resp.files[0].contents.clone()).unwrap();
     assert_codegen_snapshot("execrows", &code);
     assert!(
-        code.contains("Queries<E>"),
-        "expected Queries<E> in:\n{code}"
+        code.contains("pub async fn delete_author_rows<E: AsExecutor>"),
+        "expected free function delete_author_rows<E: AsExecutor> in:\n{code}"
+    );
+    assert!(
+        !code.contains("Queries<E>"),
+        "Queries<E> wrapper should be gone in:\n{code}"
     );
 }
 
@@ -194,8 +214,12 @@ fn snapshot_execresult() {
     let code = String::from_utf8(resp.files[0].contents.clone()).unwrap();
     assert_codegen_snapshot("execresult", &code);
     assert!(
-        code.contains("Queries<E>"),
-        "expected Queries<E> in:\n{code}"
+        code.contains("pub async fn delete_author_result<E: AsExecutor>"),
+        "expected free function delete_author_result<E: AsExecutor> in:\n{code}"
+    );
+    assert!(
+        !code.contains("Queries<E>"),
+        "Queries<E> wrapper should be gone in:\n{code}"
     );
 }
 
@@ -279,8 +303,8 @@ fn snapshot_enum_types() {
         "expected Active variant in:\n{code}"
     );
     assert!(
-        code.contains("Queries<E>"),
-        "expected Queries<E> in:\n{code}"
+        !code.contains("Queries<E>"),
+        "Queries<E> wrapper should be gone in:\n{code}"
     );
 }
 
@@ -629,6 +653,14 @@ fn snapshot_batchexec() {
         code.contains("futures_util::stream::try_unfold"),
         "expected stream implementation in:\n{code}"
     );
+    assert!(
+        code.contains("pub fn batch_delete_author<'a, E, I>"),
+        "expected free function batch_delete_author<'a, E, I> in:\n{code}"
+    );
+    assert!(
+        code.contains("db: E,"),
+        "expected db: E parameter in:\n{code}"
+    );
 }
 
 #[test]
@@ -662,6 +694,10 @@ fn snapshot_batchone() {
         code.contains("futures_util::stream::try_unfold"),
         "expected stream implementation in:\n{code}"
     );
+    assert!(
+        code.contains("pub fn batch_get_author<'a, E, I>"),
+        "expected free function batch_get_author<'a, E, I> in:\n{code}"
+    );
 }
 
 #[test]
@@ -694,6 +730,10 @@ fn snapshot_batchmany() {
     assert!(
         code.contains("futures_util::stream::try_unfold"),
         "expected stream implementation in:\n{code}"
+    );
+    assert!(
+        code.contains("pub fn batch_list_authors<'a, E, I>"),
+        "expected free function batch_list_authors<'a, E, I> in:\n{code}"
     );
 }
 
@@ -842,6 +882,10 @@ fn snapshot_copyfrom() {
     assert!(
         code.contains("COPY_AUTHORS_BATCH_SIZE"),
         "expected generated copyfrom batch size in:\n{code}"
+    );
+    assert!(
+        code.contains("pub async fn copy_authors<E: AsExecutor, I>"),
+        "expected free function copy_authors<E: AsExecutor, I> in:\n{code}"
     );
 }
 
