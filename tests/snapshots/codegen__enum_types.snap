@@ -10,21 +10,6 @@ expression: code
     reason = "generated queries may expose items a caller does not use"
 )]
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, sqlx::Type)]
-#[sqlx(type_name = "status")]
-pub enum Status {
-    #[sqlx(rename = "active")]
-    Active,
-    #[sqlx(rename = "inactive")]
-    Inactive,
-    #[sqlx(rename = "banned")]
-    Banned,
-}
-const GET_USER_STATUS: &str = "SELECT status FROM users WHERE id = $1";
-#[derive(Debug, Clone, sqlx::FromRow)]
-pub struct GetUserStatusRow {
-    pub status: Status,
-}
 pub trait AsExecutor {
     fn as_executor(&mut self) -> impl sqlx::Executor<'_, Database = sqlx::Postgres>;
 }
@@ -58,26 +43,27 @@ impl<T: AsExecutor + ?Sized> AsExecutor for &mut T {
         (**self).as_executor()
     }
 }
-#[derive(Copy, Clone)]
-pub struct Queries<E> {
-    db: E,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, sqlx::Type)]
+#[sqlx(type_name = "status")]
+pub enum Status {
+    #[sqlx(rename = "active")]
+    Active,
+    #[sqlx(rename = "inactive")]
+    Inactive,
+    #[sqlx(rename = "banned")]
+    Banned,
 }
-impl<E> Queries<E> {
-    pub fn new(db: E) -> Self {
-        Self { db }
-    }
-    pub fn into_inner(self) -> E {
-        self.db
-    }
+const GET_USER_STATUS: &str = "SELECT status FROM users WHERE id = $1";
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct GetUserStatusRow {
+    pub status: Status,
 }
-impl<E: AsExecutor> Queries<E> {
-    pub async fn get_user_status(
-        &mut self,
-        id: i64,
-    ) -> Result<GetUserStatusRow, sqlx::Error> {
-        sqlx::query_as::<_, GetUserStatusRow>(GET_USER_STATUS)
-            .bind(id)
-            .fetch_one(self.db.as_executor())
-            .await
-    }
+pub async fn get_user_status<E: AsExecutor>(
+    mut db: E,
+    id: i64,
+) -> Result<GetUserStatusRow, sqlx::Error> {
+    sqlx::query_as::<_, GetUserStatusRow>(GET_USER_STATUS)
+        .bind(id)
+        .fetch_one(db.as_executor())
+        .await
 }

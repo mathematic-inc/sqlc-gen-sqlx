@@ -3,7 +3,6 @@ use sqlx::{Connection as _, PgConnection};
 #[path = "../src/db.rs"]
 mod queries;
 
-use queries::Queries;
 
 #[tokio::test]
 async fn custom_output_filename_is_respected() -> Result<(), Box<dyn std::error::Error>> {
@@ -32,8 +31,7 @@ async fn custom_output_filename_is_respected() -> Result<(), Box<dyn std::error:
     .execute(&mut conn)
     .await?;
 
-    let mut q = Queries::new(conn);
-    let authors = q.list_authors().await?;
+    let authors = queries::list_authors(&mut conn).await?;
 
     assert_eq!(authors.len(), 2);
     assert_eq!(authors[0].name, "Alice");

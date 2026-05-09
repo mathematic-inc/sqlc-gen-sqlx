@@ -3,7 +3,7 @@ use sqlx::{Connection as _, PgConnection};
 #[path = "../src/queries.rs"]
 mod queries;
 
-use queries::{GetAuthorRow, Queries};
+use queries::GetAuthorRow;
 
 #[tokio::test]
 async fn row_derives_are_emitted_from_config() -> Result<(), Box<dyn std::error::Error>> {
@@ -28,8 +28,7 @@ async fn row_derives_are_emitted_from_config() -> Result<(), Box<dyn std::error:
         .execute(&mut conn)
         .await?;
 
-    let mut q = Queries::new(conn);
-    let author = q.get_author(1).await?;
+    let author = queries::get_author(&mut conn, 1).await?;
 
     assert_eq!(
         author,

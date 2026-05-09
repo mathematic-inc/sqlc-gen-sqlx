@@ -3,7 +3,7 @@ plugins:
   - name: sqlc-gen-sqlx
     wasm:
       url: file://target/wasm32-wasip1/debug/sqlc-gen-sqlx.wasm
-      sha256: "837a7ff89040ce7bded3d87abaaa83591353eadc99c4cd46ed9572a450b09fd2"
+      sha256: "87780a1e4ebe3f7bfb3fdd4041e8f7127b5c35d540c40b456558d87f1ef62e5b"
 
 sql:
   - schema: examples/basic/schema.sql

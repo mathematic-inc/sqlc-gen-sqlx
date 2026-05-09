@@ -2,8 +2,6 @@
 #[cfg(test)]
 mod queries;
 #[cfg(test)]
-use queries::Queries;
-#[cfg(test)]
 use sqlx::{Connection as _, PgConnection};
 
 #[cfg(test)]
@@ -41,8 +39,7 @@ async fn test_advanced_types_roundtrip() {
         .await
         .expect("insert");
 
-    let mut q = Queries::new(conn);
-    let event = q.get_event(1).await.expect("get");
+    let event = queries::get_event(&mut conn, 1).await.expect("get");
     assert_eq!(event.name, "conference");
 }
 

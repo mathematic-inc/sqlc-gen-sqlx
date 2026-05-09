@@ -10,13 +10,6 @@ expression: code
     reason = "generated queries may expose items a caller does not use"
 )]
 
-#[derive(Debug, Clone, sqlx::Type)]
-#[sqlx(type_name = "address")]
-pub struct Address {
-    pub street: Option<String>,
-    pub city: Option<String>,
-    pub zip: Option<i32>,
-}
 pub trait AsExecutor {
     fn as_executor(&mut self) -> impl sqlx::Executor<'_, Database = sqlx::Postgres>;
 }
@@ -50,15 +43,10 @@ impl<T: AsExecutor + ?Sized> AsExecutor for &mut T {
         (**self).as_executor()
     }
 }
-#[derive(Copy, Clone)]
-pub struct Queries<E> {
-    db: E,
-}
-impl<E> Queries<E> {
-    pub fn new(db: E) -> Self {
-        Self { db }
-    }
-    pub fn into_inner(self) -> E {
-        self.db
-    }
+#[derive(Debug, Clone, sqlx::Type)]
+#[sqlx(type_name = "address")]
+pub struct Address {
+    pub street: Option<String>,
+    pub city: Option<String>,
+    pub zip: Option<i32>,
 }

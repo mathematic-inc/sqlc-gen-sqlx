@@ -4,8 +4,6 @@ use sqlx::{Connection as _, PgConnection};
 #[path = "../src/queries.rs"]
 mod queries;
 
-use queries::Queries;
-
 #[tokio::test]
 async fn batchmany_streams_row_groups_per_input() -> Result<(), Box<dyn std::error::Error>> {
     let db_url = std::env::var("DATABASE_URL")?;
@@ -34,11 +32,12 @@ async fn batchmany_streams_row_groups_per_input() -> Result<(), Box<dyn std::err
     .execute(&mut conn)
     .await?;
 
-    let mut q = Queries::new(conn);
-    let batches = q
-        .batch_list_authors_by_bio([Some("%Rust%".to_string()), Some("%SQL%".to_string())])
-        .try_collect::<Vec<_>>()
-        .await?;
+    let batches = queries::batch_list_authors_by_bio(
+        &mut conn,
+        [Some("%Rust%".to_string()), Some("%SQL%".to_string())],
+    )
+    .try_collect::<Vec<_>>()
+    .await?;
 
     assert_eq!(batches.len(), 2);
     assert_eq!(batches[0].len(), 2);

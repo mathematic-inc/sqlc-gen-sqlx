@@ -435,13 +435,13 @@ pub(crate) fn build_fn_params(
     }
 }
 
-/// `:one` → `async fn foo(exec, [params]) -> Result<FooRow, sqlx::Error>`
+/// `:one` → `async fn foo<E: AsExecutor>(mut db: E, [params]) -> Result<FooRow, sqlx::Error>`
 pub fn gen_one(
     query: &QueryView<'_>,
     type_map: &TypeMap,
     config: &Config,
     col_overrides: &std::collections::HashMap<String, ResolvedType>,
-) -> Result<(TokenStream, TokenStream), Error> {
+) -> Result<TokenStream, Error> {
     let params = resolve_params(query.params.iter(), type_map, col_overrides)?;
     let columns = resolve_columns(query.columns.iter(), type_map, col_overrides)?;
 
@@ -457,44 +457,43 @@ pub fn gen_one(
     let binds = bind_calls(&params, arg_ident.as_ref());
     let dynamic_slice = has_dynamic_slice(query.text, &params);
 
-    let inner_fn = if dynamic_slice {
+    let fn_tokens = if dynamic_slice {
         let sql_setup = dynamic_sql_setup(&const_name, &params, arg_ident.as_ref());
         let bind_setup = dynamic_bind_statements(&params, arg_ident.as_ref());
         quote! {
-            pub async fn #fn_name(&mut self, #fn_params) -> Result<#row_name, sqlx::Error> {
+            pub async fn #fn_name<E: AsExecutor>(mut db: E, #fn_params) -> Result<#row_name, sqlx::Error> {
                 #sql_setup
                 let mut query = sqlx::query_as::<_, #row_name>(&sql);
                 #bind_setup
-                query.fetch_one(self.db.as_executor()).await
+                query.fetch_one(db.as_executor()).await
             }
         }
     } else {
         quote! {
-            pub async fn #fn_name(&mut self, #fn_params) -> Result<#row_name, sqlx::Error> {
+            pub async fn #fn_name<E: AsExecutor>(mut db: E, #fn_params) -> Result<#row_name, sqlx::Error> {
                 sqlx::query_as::<_, #row_name>(#const_name)
                     #binds
-                    .fetch_one(self.db.as_executor())
+                    .fetch_one(db.as_executor())
                     .await
             }
         }
     };
 
-    let outer = quote! {
+    Ok(quote! {
         #params_struct
         #const_tokens
         #row_tokens
-    };
-
-    Ok((outer, inner_fn))
+        #fn_tokens
+    })
 }
 
-/// `:many` → `async fn foo(exec, [params]) -> Result<Vec<FooRow>, sqlx::Error>`
+/// `:many` → `async fn foo<E: AsExecutor>(mut db: E, [params]) -> Result<Vec<FooRow>, sqlx::Error>`
 pub fn gen_many(
     query: &QueryView<'_>,
     type_map: &TypeMap,
     config: &Config,
     col_overrides: &std::collections::HashMap<String, ResolvedType>,
-) -> Result<(TokenStream, TokenStream), Error> {
+) -> Result<TokenStream, Error> {
     let params = resolve_params(query.params.iter(), type_map, col_overrides)?;
     let columns = resolve_columns(query.columns.iter(), type_map, col_overrides)?;
 
@@ -508,44 +507,43 @@ pub fn gen_many(
     let binds = bind_calls(&params, arg_ident.as_ref());
     let dynamic_slice = has_dynamic_slice(query.text, &params);
 
-    let inner_fn = if dynamic_slice {
+    let fn_tokens = if dynamic_slice {
         let sql_setup = dynamic_sql_setup(&const_name, &params, arg_ident.as_ref());
         let bind_setup = dynamic_bind_statements(&params, arg_ident.as_ref());
         quote! {
-            pub async fn #fn_name(&mut self, #fn_params) -> Result<Vec<#row_name>, sqlx::Error> {
+            pub async fn #fn_name<E: AsExecutor>(mut db: E, #fn_params) -> Result<Vec<#row_name>, sqlx::Error> {
                 #sql_setup
                 let mut query = sqlx::query_as::<_, #row_name>(&sql);
                 #bind_setup
-                query.fetch_all(self.db.as_executor()).await
+                query.fetch_all(db.as_executor()).await
             }
         }
     } else {
         quote! {
-            pub async fn #fn_name(&mut self, #fn_params) -> Result<Vec<#row_name>, sqlx::Error> {
+            pub async fn #fn_name<E: AsExecutor>(mut db: E, #fn_params) -> Result<Vec<#row_name>, sqlx::Error> {
                 sqlx::query_as::<_, #row_name>(#const_name)
                     #binds
-                    .fetch_all(self.db.as_executor())
+                    .fetch_all(db.as_executor())
                     .await
             }
         }
     };
 
-    let outer = quote! {
+    Ok(quote! {
         #params_struct
         #const_tokens
         #row_tokens
-    };
-
-    Ok((outer, inner_fn))
+        #fn_tokens
+    })
 }
 
-/// `:execrows` → `async fn foo(exec, [params]) -> Result<u64, sqlx::Error>`
+/// `:execrows` → `async fn foo<E: AsExecutor>(mut db: E, [params]) -> Result<u64, sqlx::Error>`
 pub fn gen_execrows(
     query: &QueryView<'_>,
     type_map: &TypeMap,
     config: &Config,
     col_overrides: &std::collections::HashMap<String, ResolvedType>,
-) -> Result<(TokenStream, TokenStream), Error> {
+) -> Result<TokenStream, Error> {
     let params = resolve_params(query.params.iter(), type_map, col_overrides)?;
     let fn_name = format_ident!("{}", to_snake_case(query.name));
     let (const_tokens, const_name) = sql_const(query.name, query.text);
@@ -553,39 +551,39 @@ pub fn gen_execrows(
         build_fn_params(query.name, &params, &config.row_derives)?;
     let binds = bind_calls(&params, arg_ident.as_ref());
     let dynamic_slice = has_dynamic_slice(query.text, &params);
-    let inner = if dynamic_slice {
+    let fn_tokens = if dynamic_slice {
         let sql_setup = dynamic_sql_setup(&const_name, &params, arg_ident.as_ref());
         let bind_setup = dynamic_bind_statements(&params, arg_ident.as_ref());
         quote! {
-            pub async fn #fn_name(&mut self, #fn_params) -> Result<u64, sqlx::Error> {
+            pub async fn #fn_name<E: AsExecutor>(mut db: E, #fn_params) -> Result<u64, sqlx::Error> {
                 #sql_setup
                 let mut query = sqlx::query(&sql);
                 #bind_setup
-                let result = query.execute(self.db.as_executor()).await?;
+                let result = query.execute(db.as_executor()).await?;
                 Ok(result.rows_affected())
             }
         }
     } else {
         quote! {
-            pub async fn #fn_name(&mut self, #fn_params) -> Result<u64, sqlx::Error> {
+            pub async fn #fn_name<E: AsExecutor>(mut db: E, #fn_params) -> Result<u64, sqlx::Error> {
                 let result = sqlx::query(#const_name)
                     #binds
-                    .execute(self.db.as_executor())
+                    .execute(db.as_executor())
                     .await?;
                 Ok(result.rows_affected())
             }
         }
     };
-    Ok((quote! { #params_struct #const_tokens }, inner))
+    Ok(quote! { #params_struct #const_tokens #fn_tokens })
 }
 
-/// `:execresult` → `async fn foo(exec, [params]) -> Result<sqlx::postgres::PgQueryResult, sqlx::Error>`
+/// `:execresult` → `async fn foo<E: AsExecutor>(mut db: E, [params]) -> Result<sqlx::postgres::PgQueryResult, sqlx::Error>`
 pub fn gen_execresult(
     query: &QueryView<'_>,
     type_map: &TypeMap,
     config: &Config,
     col_overrides: &std::collections::HashMap<String, ResolvedType>,
-) -> Result<(TokenStream, TokenStream), Error> {
+) -> Result<TokenStream, Error> {
     let params = resolve_params(query.params.iter(), type_map, col_overrides)?;
     let fn_name = format_ident!("{}", to_snake_case(query.name));
     let (const_tokens, const_name) = sql_const(query.name, query.text);
@@ -593,37 +591,37 @@ pub fn gen_execresult(
         build_fn_params(query.name, &params, &config.row_derives)?;
     let binds = bind_calls(&params, arg_ident.as_ref());
     let dynamic_slice = has_dynamic_slice(query.text, &params);
-    let inner = if dynamic_slice {
+    let fn_tokens = if dynamic_slice {
         let sql_setup = dynamic_sql_setup(&const_name, &params, arg_ident.as_ref());
         let bind_setup = dynamic_bind_statements(&params, arg_ident.as_ref());
         quote! {
-            pub async fn #fn_name(&mut self, #fn_params) -> Result<sqlx::postgres::PgQueryResult, sqlx::Error> {
+            pub async fn #fn_name<E: AsExecutor>(mut db: E, #fn_params) -> Result<sqlx::postgres::PgQueryResult, sqlx::Error> {
                 #sql_setup
                 let mut query = sqlx::query(&sql);
                 #bind_setup
-                query.execute(self.db.as_executor()).await
+                query.execute(db.as_executor()).await
             }
         }
     } else {
         quote! {
-            pub async fn #fn_name(&mut self, #fn_params) -> Result<sqlx::postgres::PgQueryResult, sqlx::Error> {
+            pub async fn #fn_name<E: AsExecutor>(mut db: E, #fn_params) -> Result<sqlx::postgres::PgQueryResult, sqlx::Error> {
                 sqlx::query(#const_name)
                     #binds
-                    .execute(self.db.as_executor())
+                    .execute(db.as_executor())
                     .await
             }
         }
     };
-    Ok((quote! { #params_struct #const_tokens }, inner))
+    Ok(quote! { #params_struct #const_tokens #fn_tokens })
 }
 
-/// `:exec` → `async fn foo(exec, [params]) -> Result<(), sqlx::Error>`
+/// `:exec` → `async fn foo<E: AsExecutor>(mut db: E, [params]) -> Result<(), sqlx::Error>`
 pub fn gen_exec(
     query: &QueryView<'_>,
     type_map: &TypeMap,
     config: &Config,
     col_overrides: &std::collections::HashMap<String, ResolvedType>,
-) -> Result<(TokenStream, TokenStream), Error> {
+) -> Result<TokenStream, Error> {
     let params = resolve_params(query.params.iter(), type_map, col_overrides)?;
     let fn_name = format_ident!("{}", to_snake_case(query.name));
     let sql = query.text;
@@ -635,46 +633,45 @@ pub fn gen_exec(
     let binds = bind_calls(&params, arg_ident.as_ref());
     let dynamic_slice = has_dynamic_slice(query.text, &params);
 
-    let inner_fn = if dynamic_slice {
+    let fn_tokens = if dynamic_slice {
         let sql_setup = dynamic_sql_setup(&const_name, &params, arg_ident.as_ref());
         let bind_setup = dynamic_bind_statements(&params, arg_ident.as_ref());
         quote! {
-            pub async fn #fn_name(&mut self, #fn_params) -> Result<(), sqlx::Error> {
+            pub async fn #fn_name<E: AsExecutor>(mut db: E, #fn_params) -> Result<(), sqlx::Error> {
                 #sql_setup
                 let mut query = sqlx::query(&sql);
                 #bind_setup
-                query.execute(self.db.as_executor()).await?;
+                query.execute(db.as_executor()).await?;
                 Ok(())
             }
         }
     } else {
         quote! {
-            pub async fn #fn_name(&mut self, #fn_params) -> Result<(), sqlx::Error> {
+            pub async fn #fn_name<E: AsExecutor>(mut db: E, #fn_params) -> Result<(), sqlx::Error> {
                 sqlx::query(#const_name)
                     #binds
-                    .execute(self.db.as_executor())
+                    .execute(db.as_executor())
                     .await?;
                 Ok(())
             }
         }
     };
 
-    let outer = quote! {
+    Ok(quote! {
         #params_struct
         #const_tokens
-    };
-
-    Ok((outer, inner_fn))
+        #fn_tokens
+    })
 }
 
-/// `:execlastid` → `async fn foo(exec, [params]) -> Result<T, sqlx::Error>`
+/// `:execlastid` → `async fn foo<E: AsExecutor>(mut db: E, [params]) -> Result<T, sqlx::Error>`
 /// where T is the type of the single RETURNING column.
 pub fn gen_execlastid(
     query: &QueryView<'_>,
     type_map: &TypeMap,
     config: &Config,
     col_overrides: &std::collections::HashMap<String, ResolvedType>,
-) -> Result<(TokenStream, TokenStream), Error> {
+) -> Result<TokenStream, Error> {
     let params = resolve_params(query.params.iter(), type_map, col_overrides)?;
     let fn_name = format_ident!("{}", to_snake_case(query.name));
     let (const_tokens, const_name) = sql_const(query.name, query.text);
@@ -696,28 +693,28 @@ pub fn gen_execlastid(
         ))
     })?;
 
-    let inner = if dynamic_slice {
+    let fn_tokens = if dynamic_slice {
         let sql_setup = dynamic_sql_setup(&const_name, &params, arg_ident.as_ref());
         let bind_setup = dynamic_bind_statements(&params, arg_ident.as_ref());
         quote! {
-            pub async fn #fn_name(&mut self, #fn_params) -> Result<#ret_ty, sqlx::Error> {
+            pub async fn #fn_name<E: AsExecutor>(mut db: E, #fn_params) -> Result<#ret_ty, sqlx::Error> {
                 #sql_setup
                 let mut query = sqlx::query_as(&sql);
                 #bind_setup
-                let (_row,): (#ret_ty,) = query.fetch_one(self.db.as_executor()).await?;
+                let (_row,): (#ret_ty,) = query.fetch_one(db.as_executor()).await?;
                 Ok(_row)
             }
         }
     } else {
         quote! {
-            pub async fn #fn_name(&mut self, #fn_params) -> Result<#ret_ty, sqlx::Error> {
+            pub async fn #fn_name<E: AsExecutor>(mut db: E, #fn_params) -> Result<#ret_ty, sqlx::Error> {
                 let (_row,): (#ret_ty,) = sqlx::query_as(#const_name)
                     #binds
-                    .fetch_one(self.db.as_executor())
+                    .fetch_one(db.as_executor())
                     .await?;
                 Ok(_row)
             }
         }
     };
-    Ok((quote! { #params_struct #const_tokens }, inner))
+    Ok(quote! { #params_struct #const_tokens #fn_tokens })
 }
