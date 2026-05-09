@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.0](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.1.7...v0.2.0) (2026-05-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* callers using Queries::new(executor).foo(...) must switch to queries::foo(executor, ...).
+
+### Features
+
+* Emit free functions instead of Queries&lt;E&gt; methods ([#17](https://github.com/mathematic-inc/sqlc-gen-sqlx/issues/17)) ([cd79857](https://github.com/mathematic-inc/sqlc-gen-sqlx/commit/cd79857eba012cf11e78a591209cdbdce07148a6))
+
 ## [0.1.7](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.1.6...v0.1.7) (2026-04-22)
 
 
