@@ -52,6 +52,22 @@ pub async fn get_author<E: AsExecutor>(mut db: E, id: i64) -> Result<GetAuthorRo
         .fetch_one(db.as_executor())
         .await
 }
+const GET_AUTHOR_BY_NAME: &str = "SELECT id, name, bio FROM authors WHERE name = $1";
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct GetAuthorByNameRow {
+    pub id: i64,
+    pub name: String,
+    pub bio: Option<String>,
+}
+pub async fn get_author_by_name<E: AsExecutor>(
+    mut db: E,
+    name: &str,
+) -> Result<GetAuthorByNameRow, sqlx::Error> {
+    sqlx::query_as::<_, GetAuthorByNameRow>(GET_AUTHOR_BY_NAME)
+        .bind(name)
+        .fetch_one(db.as_executor())
+        .await
+}
 const LIST_AUTHORS: &str = "SELECT id, name, bio FROM authors ORDER BY name";
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct ListAuthorsRow {
@@ -65,9 +81,9 @@ pub async fn list_authors<E: AsExecutor>(mut db: E) -> Result<Vec<ListAuthorsRow
         .await
 }
 #[derive(Debug, Clone)]
-pub struct CreateAuthorParams {
-    pub name: String,
-    pub bio: Option<String>,
+pub struct CreateAuthorParams<'a> {
+    pub name: &'a str,
+    pub bio: Option<&'a str>,
 }
 const CREATE_AUTHOR: &str =
     "INSERT INTO authors (name, bio) VALUES ($1, $2) RETURNING id, name, bio";
@@ -79,7 +95,7 @@ pub struct CreateAuthorRow {
 }
 pub async fn create_author<E: AsExecutor>(
     mut db: E,
-    arg: CreateAuthorParams,
+    arg: CreateAuthorParams<'_>,
 ) -> Result<CreateAuthorRow, sqlx::Error> {
     sqlx::query_as::<_, CreateAuthorRow>(CREATE_AUTHOR)
         .bind(arg.name)
@@ -94,12 +110,4 @@ pub async fn delete_author<E: AsExecutor>(mut db: E, id: i64) -> Result<(), sqlx
         .execute(db.as_executor())
         .await?;
     Ok(())
-}
-const DELETE_AUTHOR_ROWS: &str = "DELETE FROM authors WHERE id = $1";
-pub async fn delete_author_rows<E: AsExecutor>(mut db: E, id: i64) -> Result<u64, sqlx::Error> {
-    let result = sqlx::query(DELETE_AUTHOR_ROWS)
-        .bind(id)
-        .execute(db.as_executor())
-        .await?;
-    Ok(result.rows_affected())
 }

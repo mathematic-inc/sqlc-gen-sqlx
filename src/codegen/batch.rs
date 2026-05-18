@@ -3,37 +3,52 @@ use quote::{format_ident, quote};
 use syn::parse_str;
 
 use crate::{
+    codegen::lifetimes::inject_lifetime,
     config::Config,
     error::Error,
     ident::to_snake_case,
     plugin::QueryView,
-    types::{ResolvedType, TypeMap},
+    types::{ColumnOverride, TypeMap},
 };
 
 use super::query::{
-    bind_calls, dynamic_bind_statements, dynamic_sql_setup, has_dynamic_slice, maybe_params_struct,
-    resolve_columns, resolve_params, row_struct, sql_const,
+    Param, any_borrowed, bind_calls, dynamic_bind_statements, dynamic_sql_setup, has_dynamic_slice,
+    maybe_params_struct, resolve_columns, resolve_params, row_struct, sql_const,
 };
 
 fn batch_items_type(
     query_name: &str,
-    params: &[super::query::Param],
+    params: &[Param],
     derives: &[String],
 ) -> Result<(Option<TokenStream>, TokenStream), Error> {
     if params.len() >= 2 {
         let (struct_tokens, struct_ident) = maybe_params_struct(query_name, params, derives)?
             .expect("guarded by params.len() >= 2");
-        Ok((Some(struct_tokens), quote! { #struct_ident }))
+        let item_ty = if any_borrowed(params) {
+            // The struct carries `<'a>`; the stream's existing `'a` is reused
+            // by referencing the struct as `StructName<'a>`.
+            quote! { #struct_ident<'a> }
+        } else {
+            quote! { #struct_ident }
+        };
+        Ok((Some(struct_tokens), item_ty))
     } else {
         let p = &params[0];
-        let ty: syn::Type = parse_str(&p.resolved.rust_type).map_err(|e| {
-            Error::Codegen(format!("invalid Rust type '{}': {e}", p.resolved.rust_type))
-        })?;
+        // Single-param batch: if the param is borrowed we need to inject the
+        // stream's `'a` because `where Item = ...` cannot use elided
+        // lifetimes.
+        let ty_str = if let Some(borrowed) = &p.resolved.borrowed_rust_type {
+            inject_lifetime(borrowed, "'a")?
+        } else {
+            p.resolved.rust_type.clone()
+        };
+        let ty: syn::Type = parse_str(&ty_str)
+            .map_err(|e| Error::Codegen(format!("invalid Rust type '{ty_str}': {e}")))?;
         Ok((None, quote! { #ty }))
     }
 }
 
-fn single_item_alias(params: &[super::query::Param]) -> Option<TokenStream> {
+fn single_item_alias(params: &[Param]) -> Option<TokenStream> {
     (params.len() == 1).then(|| {
         let ident = params[0].ident.clone();
         quote! { let #ident = item; }
@@ -75,7 +90,7 @@ pub fn gen_batchexec(
     query: &QueryView<'_>,
     type_map: &TypeMap,
     config: &Config,
-    col_overrides: &std::collections::HashMap<String, ResolvedType>,
+    col_overrides: &std::collections::HashMap<String, ColumnOverride>,
 ) -> Result<TokenStream, Error> {
     let params = resolve_params(query.params.iter(), type_map, col_overrides)?;
     if params.is_empty() {
@@ -132,7 +147,7 @@ pub fn gen_batchone(
     query: &QueryView<'_>,
     type_map: &TypeMap,
     config: &Config,
-    col_overrides: &std::collections::HashMap<String, ResolvedType>,
+    col_overrides: &std::collections::HashMap<String, ColumnOverride>,
 ) -> Result<TokenStream, Error> {
     let params = resolve_params(query.params.iter(), type_map, col_overrides)?;
     if params.is_empty() {
@@ -192,7 +207,7 @@ pub fn gen_batchmany(
     query: &QueryView<'_>,
     type_map: &TypeMap,
     config: &Config,
-    col_overrides: &std::collections::HashMap<String, ResolvedType>,
+    col_overrides: &std::collections::HashMap<String, ColumnOverride>,
 ) -> Result<TokenStream, Error> {
     let params = resolve_params(query.params.iter(), type_map, col_overrides)?;
     if params.is_empty() {

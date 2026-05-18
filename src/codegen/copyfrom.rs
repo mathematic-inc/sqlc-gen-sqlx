@@ -3,20 +3,21 @@ use quote::{format_ident, quote};
 use syn::parse_str;
 
 use crate::{
+    codegen::lifetimes::inject_lifetime,
     config::Config,
     error::Error,
     ident::to_snake_case,
     plugin::QueryView,
-    types::{ResolvedType, TypeMap},
+    types::{ColumnOverride, TypeMap},
 };
 
-use super::query::{Param, maybe_params_struct, resolve_params, sql_const};
+use super::query::{Param, any_borrowed, maybe_params_struct, resolve_params, sql_const};
 
 pub fn gen_copyfrom(
     query: &QueryView<'_>,
     type_map: &TypeMap,
     config: &Config,
-    col_overrides: &std::collections::HashMap<String, ResolvedType>,
+    col_overrides: &std::collections::HashMap<String, ColumnOverride>,
 ) -> Result<TokenStream, Error> {
     let params = resolve_params(query.params.iter(), type_map, col_overrides)?;
     if params.is_empty() {
@@ -31,26 +32,44 @@ pub fn gen_copyfrom(
     let insert_prefix = insert_prefix(query.text)?;
     let (const_tokens, const_name) = sql_const(query.name, &insert_prefix);
     let batch_size = std::cmp::max(1usize, 65_535usize / params.len());
+    let has_borrowed = any_borrowed(&params);
 
     let (params_struct, items_ty, builder_binds) = if params.len() >= 2 {
         let (struct_tokens, struct_ident) =
             maybe_params_struct(query.name, &params, &config.row_derives)?
                 .expect("guarded by params.len() >= 2");
+        let item_ty = if has_borrowed {
+            quote! { #struct_ident<'a> }
+        } else {
+            quote! { #struct_ident }
+        };
         (
             Some(struct_tokens),
-            quote! { #struct_ident },
+            item_ty,
             push_bind_calls(&params, Some(&format_ident!("item"))),
         )
     } else {
         let p = &params[0];
-        let ty: syn::Type = parse_str(&p.resolved.rust_type).map_err(|e| {
-            Error::Codegen(format!("invalid Rust type '{}': {e}", p.resolved.rust_type))
-        })?;
+        let ty_str = if let Some(borrowed) = &p.resolved.borrowed_rust_type {
+            inject_lifetime(borrowed, "'a")?
+        } else {
+            p.resolved.rust_type.clone()
+        };
+        let ty: syn::Type = parse_str(&ty_str)
+            .map_err(|e| Error::Codegen(format!("invalid Rust type '{ty_str}': {e}")))?;
         (None, quote! { #ty }, push_bind_calls(&params, None))
     };
 
+    // The `where Item = ...` clause cannot use anonymous lifetimes, so we
+    // introduce `'a` to the fn signature whenever any param is borrowed.
+    let generics = if has_borrowed {
+        quote! { <'a, E: AsExecutor, I> }
+    } else {
+        quote! { <E: AsExecutor, I> }
+    };
+
     let fn_tokens = quote! {
-        pub async fn #fn_name<E: AsExecutor, I>(mut db: E, items: I) -> Result<u64, sqlx::Error>
+        pub async fn #fn_name #generics (mut db: E, items: I) -> Result<u64, sqlx::Error>
         where
             I: IntoIterator<Item = #items_ty>,
         {

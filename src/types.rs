@@ -3,23 +3,36 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct ResolvedType {
+    /// Owned Rust type used for row struct fields, array contents, and any
+    /// position that takes the value by value. Always present.
     pub rust_type: String,
+    /// Borrowed Rust type used for scalar parameter positions when the
+    /// override opted into borrowed mode. `None` means the position should
+    /// use `rust_type`.
+    ///
+    /// Lifetimes in this string are anonymous (`&str`, not `&'a str`); the
+    /// codegen runs a lifetime-injection pass when emitting into positions
+    /// that require a named lifetime (struct field, where clause).
+    pub borrowed_rust_type: Option<String>,
     pub copy_cheap: bool,
 }
 
-impl ResolvedType {
-    fn new(rust_type: impl Into<String>, copy_cheap: bool) -> Self {
-        Self {
-            rust_type: rust_type.into(),
-            copy_cheap,
-        }
-    }
+/// Stored representation of a user override: both forms tracked independently
+/// so the resolver can pick the right one for each context.
+#[derive(Debug, Clone)]
+struct OverrideEntry {
+    /// Owned form: `None` means "use the built-in default for the PG type".
+    owned: Option<String>,
+    /// Borrowed form: `None` means the override did not opt into borrowed
+    /// mode.
+    borrowed: Option<String>,
+    copy_cheap: bool,
 }
 
 pub struct TypeMap {
     defaults: HashMap<&'static str, (&'static str, bool)>,
-    type_overrides: HashMap<String, ResolvedType>,
-    custom_types: HashMap<String, ResolvedType>,
+    type_overrides: HashMap<String, OverrideEntry>,
+    custom_types: HashMap<String, (String, bool)>,
 }
 
 impl TypeMap {
@@ -192,12 +205,16 @@ impl TypeMap {
             defaults.insert(n, ("bit_vec::BitVec", false));
         }
 
-        let mut type_overrides = HashMap::new();
+        let mut type_overrides: HashMap<String, OverrideEntry> = HashMap::new();
         for o in overrides {
             if let Some(db_type) = &o.db_type {
                 type_overrides.insert(
                     db_type.to_lowercase(),
-                    ResolvedType::new(o.rs_type.clone(), o.copy_cheap),
+                    OverrideEntry {
+                        owned: o.rs_type.clone(),
+                        borrowed: o.borrowed_rs_type.clone(),
+                        copy_cheap: o.copy_cheap,
+                    },
                 );
             }
         }
@@ -206,8 +223,15 @@ impl TypeMap {
             let key = name.to_lowercase();
             if let Some(ovr) = type_overrides.get_mut(&key) {
                 ovr.copy_cheap = true;
-            } else if let Some(&(ty, _)) = defaults.get(key.as_str()) {
-                type_overrides.insert(key, ResolvedType::new(ty.to_string(), true));
+            } else if defaults.contains_key(key.as_str()) {
+                type_overrides.insert(
+                    key,
+                    OverrideEntry {
+                        owned: None,
+                        borrowed: None,
+                        copy_cheap: true,
+                    },
+                );
             }
         }
 
@@ -222,10 +246,8 @@ impl TypeMap {
     /// Registered types are checked after both `type_overrides` and `defaults`,
     /// so user-level overrides and built-in defaults always take precedence.
     pub fn register(&mut self, pg_name: &str, rust_name: &str, copy_cheap: bool) {
-        self.custom_types.insert(
-            pg_name.to_lowercase(),
-            ResolvedType::new(rust_name.to_string(), copy_cheap),
-        );
+        self.custom_types
+            .insert(pg_name.to_lowercase(), (rust_name.to_string(), copy_cheap));
     }
 
     pub fn resolve_pg_type(
@@ -244,20 +266,38 @@ impl TypeMap {
         array_dims: usize,
     ) -> Option<ResolvedType> {
         let key = pg_type.to_lowercase();
-        let (inner, copy_cheap) = if let Some(ovr) = self.type_overrides.get(&key) {
-            (ovr.rust_type.clone(), ovr.copy_cheap)
-        } else if let Some(&(ty, cc)) = self.defaults.get(key.as_str()) {
-            (ty.to_string(), cc)
-        } else if let Some(custom) = self.custom_types.get(&key) {
-            (custom.rust_type.clone(), custom.copy_cheap)
-        } else {
-            return None;
-        };
+        let (owned_inner, borrowed_inner, copy_cheap) =
+            if let Some(ovr) = self.type_overrides.get(&key) {
+                let default = self.defaults.get(key.as_str()).map(|&(t, _)| t.to_string());
+                let owned = ovr
+                    .owned
+                    .clone()
+                    .or(default)
+                    .or_else(|| self.custom_types.get(&key).map(|(name, _)| name.clone()));
+                (owned, ovr.borrowed.clone(), ovr.copy_cheap)
+            } else if let Some(&(ty, cc)) = self.defaults.get(key.as_str()) {
+                (Some(ty.to_string()), None, cc)
+            } else if let Some((name, cc)) = self.custom_types.get(&key) {
+                (Some(name.clone()), None, *cc)
+            } else {
+                return None;
+            };
 
-        let rust_type = wrap_type(&inner, nullable, array_dims);
+        let owned = wrap_owned(owned_inner.as_deref()?, nullable, array_dims);
+        let borrowed = borrowed_inner.map(|inner| {
+            // Array wraps revert inner to owned default, and the outermost
+            // wrapper becomes a borrowed slice.
+            wrap_borrowed(
+                &inner,
+                owned_inner.as_deref().unwrap_or(""),
+                nullable,
+                array_dims,
+            )
+        });
         let effective_copy_cheap = copy_cheap && !nullable && array_dims == 0;
         Some(ResolvedType {
-            rust_type,
+            rust_type: owned,
+            borrowed_rust_type: borrowed,
             copy_cheap: effective_copy_cheap,
         })
     }
@@ -268,7 +308,7 @@ impl TypeMap {
         nullable: bool,
         is_array: bool,
         column_key: Option<&str>,
-        column_overrides: &HashMap<String, ResolvedType>,
+        column_overrides: &HashMap<String, ColumnOverride>,
     ) -> Option<ResolvedType> {
         self.resolve_column_dims(
             pg_type,
@@ -285,15 +325,30 @@ impl TypeMap {
         nullable: bool,
         array_dims: usize,
         column_key: Option<&str>,
-        column_overrides: &HashMap<String, ResolvedType>,
+        column_overrides: &HashMap<String, ColumnOverride>,
     ) -> Option<ResolvedType> {
         if let Some(key) = column_key
             && let Some(ovr) = column_overrides.get(key)
         {
-            let rust_type = wrap_type(&ovr.rust_type, nullable, array_dims);
+            // Owned form for the column: explicit `rs_type` wins; otherwise
+            // fall back to the type-level resolution (which itself may have
+            // an override or fall back to a default).
+            let owned_inner = if let Some(owned) = &ovr.owned {
+                owned.clone()
+            } else if let Some(resolved) = self.resolve_pg_type_dims(pg_type, false, 0) {
+                resolved.rust_type
+            } else {
+                return None;
+            };
+            let owned = wrap_owned(&owned_inner, nullable, array_dims);
+            let borrowed = ovr
+                .borrowed
+                .as_ref()
+                .map(|b| wrap_borrowed(b, &owned_inner, nullable, array_dims));
             let cc = ovr.copy_cheap && !nullable && array_dims == 0;
             return Some(ResolvedType {
-                rust_type,
+                rust_type: owned,
+                borrowed_rust_type: borrowed,
                 copy_cheap: cc,
             });
         }
@@ -301,7 +356,26 @@ impl TypeMap {
     }
 }
 
-fn wrap_type(inner: &str, nullable: bool, array_dims: usize) -> String {
+/// Per-column override stored separately from the type-level map.
+#[derive(Debug, Clone)]
+pub struct ColumnOverride {
+    pub owned: Option<String>,
+    pub borrowed: Option<String>,
+    pub copy_cheap: bool,
+}
+
+impl ColumnOverride {
+    #[cfg(test)]
+    pub fn owned_form(rust_type: impl Into<String>, copy_cheap: bool) -> Self {
+        Self {
+            owned: Some(rust_type.into()),
+            borrowed: None,
+            copy_cheap,
+        }
+    }
+}
+
+fn wrap_owned(inner: &str, nullable: bool, array_dims: usize) -> String {
     let mut t = inner.to_string();
     for _ in 0..array_dims {
         t = format!("Vec<{t}>");
@@ -309,14 +383,42 @@ fn wrap_type(inner: &str, nullable: bool, array_dims: usize) -> String {
     if nullable { format!("Option<{t}>") } else { t }
 }
 
-pub fn build_column_overrides(overrides: &[TypeOverride]) -> HashMap<String, ResolvedType> {
+fn wrap_borrowed(
+    borrowed_inner: &str,
+    owned_inner: &str,
+    nullable: bool,
+    array_dims: usize,
+) -> String {
+    let body = if array_dims == 0 {
+        borrowed_inner.to_string()
+    } else {
+        let mut t = owned_inner.to_string();
+        // Inner array dimensions stay as owned `Vec<...>`.
+        for _ in 0..(array_dims - 1) {
+            t = format!("Vec<{t}>");
+        }
+        // The outermost array becomes a borrowed slice.
+        format!("&[{t}]")
+    };
+    if nullable {
+        format!("Option<{body}>")
+    } else {
+        body
+    }
+}
+
+pub fn build_column_overrides(overrides: &[TypeOverride]) -> HashMap<String, ColumnOverride> {
     overrides
         .iter()
         .filter_map(|o| {
             o.column.as_ref().map(|col| {
                 (
                     col.clone(),
-                    ResolvedType::new(o.rs_type.clone(), o.copy_cheap),
+                    ColumnOverride {
+                        owned: o.rs_type.clone(),
+                        borrowed: o.borrowed_rs_type.clone(),
+                        copy_cheap: o.copy_cheap,
+                    },
                 )
             })
         })
@@ -331,10 +433,21 @@ mod tests {
         TypeMap::new(&[], &[])
     }
 
+    fn owned_override(db_type: &str, rs_type: &str) -> TypeOverride {
+        TypeOverride {
+            db_type: Some(db_type.to_string()),
+            column: None,
+            rs_type: Some(rs_type.to_string()),
+            borrowed_rs_type: None,
+            copy_cheap: false,
+        }
+    }
+
     #[test]
     fn maps_text() {
         let t = map().resolve_pg_type("text", false, false).unwrap();
         assert_eq!(t.rust_type, "String");
+        assert!(t.borrowed_rust_type.is_none());
         assert!(!t.copy_cheap);
     }
     #[test]
@@ -394,32 +507,24 @@ mod tests {
     }
     #[test]
     fn type_override_replaces_default() {
-        use crate::config::TypeOverride;
-        let ovr = TypeOverride {
-            db_type: Some("timestamptz".to_string()),
-            column: None,
-            rs_type: "time::OffsetDateTime".to_string(),
-            copy_cheap: false,
-        };
-        let t = TypeMap::new(&[ovr], &[])
-            .resolve_pg_type("timestamptz", false, false)
-            .unwrap();
+        let t = TypeMap::new(
+            &[owned_override("timestamptz", "time::OffsetDateTime")],
+            &[],
+        )
+        .resolve_pg_type("timestamptz", false, false)
+        .unwrap();
         assert_eq!(t.rust_type, "time::OffsetDateTime");
+        assert!(t.borrowed_rust_type.is_none());
     }
     #[test]
     fn column_override_beats_type_override() {
-        use crate::config::TypeOverride;
         let overrides = vec![
-            TypeOverride {
-                db_type: Some("text".to_string()),
-                column: None,
-                rs_type: "TypeLevel".to_string(),
-                copy_cheap: false,
-            },
+            owned_override("text", "TypeLevel"),
             TypeOverride {
                 db_type: None,
                 column: Some("users.name".to_string()),
-                rs_type: "ColumnLevel".to_string(),
+                rs_type: Some("ColumnLevel".to_string()),
+                borrowed_rs_type: None,
                 copy_cheap: false,
             },
         ];
@@ -474,14 +579,7 @@ mod tests {
     }
     #[test]
     fn type_override_beats_registered_custom() {
-        use crate::config::TypeOverride;
-        let ovr = TypeOverride {
-            db_type: Some("my_enum".to_string()),
-            column: None,
-            rs_type: "Override".to_string(),
-            copy_cheap: false,
-        };
-        let mut map = TypeMap::new(&[ovr], &[]);
+        let mut map = TypeMap::new(&[owned_override("my_enum", "Override")], &[]);
         map.register("my_enum", "MyEnum", false);
         let t = map.resolve_pg_type("my_enum", false, false).unwrap();
         // type_overrides must win over custom_types
@@ -541,5 +639,95 @@ mod tests {
         let map = TypeMap::new(&[], &["uuid".to_string()]);
         let t = map.resolve_pg_type("uuid", false, false).unwrap();
         assert!(t.copy_cheap);
+    }
+
+    // --- Borrowed mode -----------------------------------------------------
+
+    fn borrowed_text() -> TypeOverride {
+        TypeOverride {
+            db_type: Some("text".to_string()),
+            column: None,
+            rs_type: None,
+            borrowed_rs_type: Some("&str".to_string()),
+            copy_cheap: false,
+        }
+    }
+
+    #[test]
+    fn borrowed_only_override_keeps_default_for_owned_form() {
+        let map = TypeMap::new(&[borrowed_text()], &[]);
+        let t = map.resolve_pg_type("text", false, false).unwrap();
+        assert_eq!(t.rust_type, "String");
+        assert_eq!(t.borrowed_rust_type.as_deref(), Some("&str"));
+    }
+
+    #[test]
+    fn borrowed_nullable_wraps_inside_option() {
+        let map = TypeMap::new(&[borrowed_text()], &[]);
+        let t = map.resolve_pg_type("text", true, false).unwrap();
+        assert_eq!(t.rust_type, "Option<String>");
+        assert_eq!(t.borrowed_rust_type.as_deref(), Some("Option<&str>"));
+    }
+
+    #[test]
+    fn borrowed_array_uses_owned_inner_in_slice() {
+        let map = TypeMap::new(&[borrowed_text()], &[]);
+        let t = map.resolve_pg_type("text", false, true).unwrap();
+        assert_eq!(t.rust_type, "Vec<String>");
+        assert_eq!(t.borrowed_rust_type.as_deref(), Some("&[String]"));
+    }
+
+    #[test]
+    fn borrowed_nullable_array() {
+        let map = TypeMap::new(&[borrowed_text()], &[]);
+        let t = map.resolve_pg_type("text", true, true).unwrap();
+        assert_eq!(t.rust_type, "Option<Vec<String>>");
+        assert_eq!(t.borrowed_rust_type.as_deref(), Some("Option<&[String]>"));
+    }
+
+    #[test]
+    fn borrowed_multidim_array_inner_stays_vec() {
+        let map = TypeMap::new(&[borrowed_text()], &[]);
+        let t = map.resolve_pg_type_dims("text", false, 2).unwrap();
+        assert_eq!(t.rust_type, "Vec<Vec<String>>");
+        assert_eq!(t.borrowed_rust_type.as_deref(), Some("&[Vec<String>]"));
+    }
+
+    #[test]
+    fn owned_and_borrowed_pair() {
+        let ovr = TypeOverride {
+            db_type: Some("text".to_string()),
+            column: None,
+            rs_type: Some("MyStr".to_string()),
+            borrowed_rs_type: Some("&MyStr".to_string()),
+            copy_cheap: false,
+        };
+        let map = TypeMap::new(&[ovr], &[]);
+        let t = map.resolve_pg_type("text", false, false).unwrap();
+        assert_eq!(t.rust_type, "MyStr");
+        assert_eq!(t.borrowed_rust_type.as_deref(), Some("&MyStr"));
+
+        let t = map.resolve_pg_type("text", false, true).unwrap();
+        // Array uses owned inner from the override.
+        assert_eq!(t.rust_type, "Vec<MyStr>");
+        assert_eq!(t.borrowed_rust_type.as_deref(), Some("&[MyStr]"));
+    }
+
+    #[test]
+    fn borrowed_column_override() {
+        let overrides = vec![TypeOverride {
+            db_type: None,
+            column: Some("users.name".to_string()),
+            rs_type: None,
+            borrowed_rs_type: Some("&str".to_string()),
+            copy_cheap: false,
+        }];
+        let col_ovrs = build_column_overrides(&overrides);
+        let map = TypeMap::new(&overrides, &[]);
+        let t = map
+            .resolve_column("text", false, false, Some("users.name"), &col_ovrs)
+            .unwrap();
+        assert_eq!(t.rust_type, "String");
+        assert_eq!(t.borrowed_rust_type.as_deref(), Some("&str"));
     }
 }
