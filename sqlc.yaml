@@ -3,7 +3,7 @@ plugins:
   - name: sqlc-gen-sqlx
     wasm:
       url: file://target/wasm32-wasip1/debug/sqlc-gen-sqlx.wasm
-      sha256: "87780a1e4ebe3f7bfb3fdd4041e8f7127b5c35d540c40b456558d87f1ef62e5b"
+      sha256: "0405bc13685568ff34c6ff8fb43fc4fe474916b1175007c31b2485c99a6ee2a7"
 
 sql:
   - schema: examples/basic/schema.sql
@@ -41,3 +41,15 @@ sql:
         out: examples/enums/src
         options:
           output: queries.rs
+
+  - schema: examples/borrowed/schema.sql
+    queries: examples/borrowed/queries.sql
+    engine: postgresql
+    codegen:
+      - plugin: sqlc-gen-sqlx
+        out: examples/borrowed/src
+        options:
+          output: queries.rs
+          overrides:
+            - db_type: "text"
+              borrowed_rs_type: "&str"
