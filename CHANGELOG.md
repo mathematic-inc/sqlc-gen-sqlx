@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.2.0...v0.2.1) (2026-05-18)
+
+
+### Features
+
+* Support borrowed parameter types via borrowed_rs_type override ([#19](https://github.com/mathematic-inc/sqlc-gen-sqlx/issues/19)) ([6ce89a3](https://github.com/mathematic-inc/sqlc-gen-sqlx/commit/6ce89a3292b64ea0f2f0634d409a3f8e20ea831a))
+
 ## [0.2.0](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.1.7...v0.2.0) (2026-05-09)
 
 
