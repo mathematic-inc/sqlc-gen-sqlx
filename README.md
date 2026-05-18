@@ -56,7 +56,7 @@ All options are passed in `codegen[*].options`:
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `output` | string | `queries.rs` | Output filename |
-| `overrides` | array | `[]` | Type overrides (see below) |
+| `overrides` | array | `[]` | Type overrides (`rs_type`, optional `borrowed_rs_type`; see below) |
 | `row_derives` | array | `[]` | Extra derives for row and params structs |
 | `enum_derives` | array | `[]` | Extra derives for generated enum types |
 | `composite_derives` | array | `[]` | Extra derives for generated composite types |
@@ -76,6 +76,55 @@ options:
       rs_type: "chrono::DateTime<chrono::Local>"
       copy_cheap: false
 ```
+
+### Borrowed parameters
+
+Add `borrowed_rs_type` to a type or column override to take that type by
+reference in parameter positions. Row struct fields, array contents, and the
+`Item` of `:copyfrom` chunks continue to use the owned form:
+
+```yaml
+options:
+  overrides:
+    - db_type: "text"
+      borrowed_rs_type: "&str"
+```
+
+With that override, generated signatures borrow scalar `text` parameters and
+the codegen threads lifetimes only where needed:
+
+```rust
+// Scalar — lifetime elided
+pub async fn get_author_by_name<E: AsExecutor>(
+    mut db: E, name: &str,
+) -> Result<GetAuthorByNameRow, sqlx::Error> { ... }
+
+// Multiple params — struct carries `'a`, fn uses `'_`
+pub struct CreateAuthorParams<'a> {
+    pub name: &'a str,
+    pub bio: Option<&'a str>,
+}
+pub async fn create_author<E: AsExecutor>(
+    mut db: E, arg: CreateAuthorParams<'_>,
+) -> Result<CreateAuthorRow, sqlx::Error> { ... }
+
+// Row struct stays owned — results are returned by value
+pub struct GetAuthorByNameRow { pub name: String, /* ... */ }
+```
+
+`rs_type` is optional alongside `borrowed_rs_type`. Omit it to keep the
+built-in owned default; set both to fully customize:
+
+```yaml
+overrides:
+  - db_type: "text"
+    rs_type: "MyStr"           # used for row fields & array contents
+    borrowed_rs_type: "&MyStr" # used for scalar params
+```
+
+For `text[]` and `sqlc.slice(text)` the wrapper becomes a borrowed slice while
+the inner item stays owned (`&[String]`), so callers can pass `&my_vec`
+directly without re-collecting.
 
 ## Supported PostgreSQL types
 

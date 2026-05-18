@@ -305,6 +305,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "borrowed"
+version = "0.1.0"
+dependencies = [
+ "sqlx",
+ "tokio",
+]
+
+[[package]]
 name = "buffa"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

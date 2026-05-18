@@ -34,6 +34,10 @@ fn authors_table() -> Table {
 }
 
 fn make_request(queries: Vec<Query>) -> Vec<u8> {
+    make_request_with_options(queries, b"{}")
+}
+
+fn make_request_with_options(queries: Vec<Query>, options: &[u8]) -> Vec<u8> {
     let req = GenerateRequest {
         catalog: Some(Catalog {
             default_schema: "public".to_string(),
@@ -46,7 +50,7 @@ fn make_request(queries: Vec<Query>) -> Vec<u8> {
         })
         .into(),
         queries,
-        plugin_options: b"{}".to_vec(),
+        plugin_options: options.to_vec(),
         sqlc_version: "1.0.0-test".to_string(),
         ..Default::default()
     };
@@ -1019,5 +1023,324 @@ fn snapshot_batch_dynamic_slice_param() {
     assert!(
         code.contains("for value in ids"),
         "expected per-element binding inside batch stream in:\n{code}"
+    );
+}
+
+// ---- Borrowed mode --------------------------------------------------------
+
+const BORROWED_TEXT_OPTIONS: &[u8] =
+    br#"{"overrides":[{"db_type":"text","borrowed_rs_type":"&str"}]}"#;
+
+#[test]
+fn snapshot_borrowed_scalar() {
+    let query = Query {
+        name: "DeleteByName".to_string(),
+        cmd: ":exec".to_string(),
+        text: "DELETE FROM authors WHERE name = $1".to_string(),
+        params: vec![Parameter {
+            number: 1,
+            column: Some(make_author_column("name", "text", true)).into(),
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let bytes = make_request_with_options(vec![query], BORROWED_TEXT_OPTIONS);
+    let out = run_with_bytes(&bytes).expect("generate failed");
+    let resp = sqlc_gen_sqlx::plugin::GenerateResponse::decode_from_slice(&out).unwrap();
+    let code = String::from_utf8(resp.files[0].contents.clone()).unwrap();
+    assert_codegen_snapshot("borrowed_scalar", &code);
+    assert!(
+        code.contains("name: &str"),
+        "expected name: &str (elided) in:\n{code}"
+    );
+    assert!(
+        !code.contains("DeleteByNameParams"),
+        "single param must not emit a params struct in:\n{code}"
+    );
+}
+
+#[test]
+fn snapshot_borrowed_params_struct() {
+    let query = Query {
+        name: "UpdateAuthor".to_string(),
+        cmd: ":exec".to_string(),
+        text: "UPDATE authors SET name = $1, bio = $2".to_string(),
+        params: vec![
+            Parameter {
+                number: 1,
+                column: Some(make_author_column("name", "text", true)).into(),
+                ..Default::default()
+            },
+            Parameter {
+                number: 2,
+                column: Some(make_author_column("bio", "text", false)).into(),
+                ..Default::default()
+            },
+        ],
+        ..Default::default()
+    };
+    let bytes = make_request_with_options(vec![query], BORROWED_TEXT_OPTIONS);
+    let out = run_with_bytes(&bytes).expect("generate failed");
+    let resp = sqlc_gen_sqlx::plugin::GenerateResponse::decode_from_slice(&out).unwrap();
+    let code = String::from_utf8(resp.files[0].contents.clone()).unwrap();
+    assert_codegen_snapshot("borrowed_params_struct", &code);
+    assert!(
+        code.contains("pub struct UpdateAuthorParams<'a>"),
+        "expected struct with <'a> in:\n{code}"
+    );
+    assert!(
+        code.contains("pub name: &'a str"),
+        "expected &'a str field in:\n{code}"
+    );
+    assert!(
+        code.contains("pub bio: Option<&'a str>"),
+        "expected Option<&'a str> field in:\n{code}"
+    );
+    assert!(
+        code.contains("arg: UpdateAuthorParams<'_>"),
+        "expected arg: UpdateAuthorParams<'_> (elided) in:\n{code}"
+    );
+}
+
+#[test]
+fn snapshot_borrowed_array_param() {
+    let array_col = Column {
+        name: "tags".to_string(),
+        r#type: Some(Identifier {
+            name: "text".to_string(),
+            ..Default::default()
+        })
+        .into(),
+        not_null: true,
+        is_array: true,
+        ..Default::default()
+    };
+    let query = Query {
+        name: "ListByTags".to_string(),
+        cmd: ":exec".to_string(),
+        text: "DELETE FROM authors WHERE name = ANY($1)".to_string(),
+        params: vec![Parameter {
+            number: 1,
+            column: Some(array_col).into(),
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let bytes = make_request_with_options(vec![query], BORROWED_TEXT_OPTIONS);
+    let out = run_with_bytes(&bytes).expect("generate failed");
+    let resp = sqlc_gen_sqlx::plugin::GenerateResponse::decode_from_slice(&out).unwrap();
+    let code = String::from_utf8(resp.files[0].contents.clone()).unwrap();
+    assert_codegen_snapshot("borrowed_array_param", &code);
+    assert!(
+        code.contains("tags: &[String]"),
+        "expected &[String] for borrowed array of text in:\n{code}"
+    );
+}
+
+#[test]
+fn snapshot_borrowed_slice_param() {
+    let slice_col = Column {
+        name: "names".to_string(),
+        r#type: Some(Identifier {
+            name: "text".to_string(),
+            ..Default::default()
+        })
+        .into(),
+        not_null: true,
+        is_sqlc_slice: true,
+        ..Default::default()
+    };
+    let query = Query {
+        name: "DeleteByNames".to_string(),
+        cmd: ":exec".to_string(),
+        text: "DELETE FROM authors WHERE name = ANY($1)".to_string(),
+        params: vec![Parameter {
+            number: 1,
+            column: Some(slice_col).into(),
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let bytes = make_request_with_options(vec![query], BORROWED_TEXT_OPTIONS);
+    let out = run_with_bytes(&bytes).expect("generate failed");
+    let resp = sqlc_gen_sqlx::plugin::GenerateResponse::decode_from_slice(&out).unwrap();
+    let code = String::from_utf8(resp.files[0].contents.clone()).unwrap();
+    assert_codegen_snapshot("borrowed_slice_param", &code);
+    assert!(
+        code.contains("names: &[String]"),
+        "expected &[String] for sqlc.slice(text) in:\n{code}"
+    );
+}
+
+#[test]
+fn snapshot_borrowed_one_row_unaffected() {
+    let query = Query {
+        name: "GetAuthorByName".to_string(),
+        cmd: ":one".to_string(),
+        text: "SELECT id, name, bio FROM authors WHERE name = $1".to_string(),
+        columns: vec![
+            make_author_column("id", "int8", true),
+            make_author_column("name", "text", true),
+            make_author_column("bio", "text", false),
+        ],
+        params: vec![Parameter {
+            number: 1,
+            column: Some(make_author_column("name", "text", true)).into(),
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let bytes = make_request_with_options(vec![query], BORROWED_TEXT_OPTIONS);
+    let out = run_with_bytes(&bytes).expect("generate failed");
+    let resp = sqlc_gen_sqlx::plugin::GenerateResponse::decode_from_slice(&out).unwrap();
+    let code = String::from_utf8(resp.files[0].contents.clone()).unwrap();
+    assert_codegen_snapshot("borrowed_one_row_unaffected", &code);
+    assert!(code.contains("name: &str"), "param uses &str in:\n{code}");
+    assert!(
+        code.contains("pub name: String"),
+        "row field stays owned String in:\n{code}"
+    );
+    assert!(
+        code.contains("pub bio: Option<String>"),
+        "nullable row field stays Option<String> in:\n{code}"
+    );
+}
+
+#[test]
+fn snapshot_borrowed_batchexec() {
+    let query = Query {
+        name: "BatchDeleteByName".to_string(),
+        cmd: ":batchexec".to_string(),
+        text: "DELETE FROM authors WHERE name = $1".to_string(),
+        params: vec![Parameter {
+            number: 1,
+            column: Some(make_author_column("name", "text", true)).into(),
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let bytes = make_request_with_options(vec![query], BORROWED_TEXT_OPTIONS);
+    let out = run_with_bytes(&bytes).expect("generate failed");
+    let resp = sqlc_gen_sqlx::plugin::GenerateResponse::decode_from_slice(&out).unwrap();
+    let code = String::from_utf8(resp.files[0].contents.clone()).unwrap();
+    assert_codegen_snapshot("borrowed_batchexec", &code);
+    assert!(
+        code.contains("IntoIterator<Item = &'a str>"),
+        "expected Item = &'a str using the stream's lifetime in:\n{code}"
+    );
+}
+
+#[test]
+fn snapshot_borrowed_batchexec_struct() {
+    let query = Query {
+        name: "BatchUpdateAuthor".to_string(),
+        cmd: ":batchexec".to_string(),
+        text: "UPDATE authors SET name = $1, bio = $2 WHERE id = $3".to_string(),
+        params: vec![
+            Parameter {
+                number: 1,
+                column: Some(make_author_column("name", "text", true)).into(),
+                ..Default::default()
+            },
+            Parameter {
+                number: 2,
+                column: Some(make_author_column("bio", "text", false)).into(),
+                ..Default::default()
+            },
+            Parameter {
+                number: 3,
+                column: Some(make_author_column("id", "int8", true)).into(),
+                ..Default::default()
+            },
+        ],
+        ..Default::default()
+    };
+    let bytes = make_request_with_options(vec![query], BORROWED_TEXT_OPTIONS);
+    let out = run_with_bytes(&bytes).expect("generate failed");
+    let resp = sqlc_gen_sqlx::plugin::GenerateResponse::decode_from_slice(&out).unwrap();
+    let code = String::from_utf8(resp.files[0].contents.clone()).unwrap();
+    assert_codegen_snapshot("borrowed_batchexec_struct", &code);
+    assert!(
+        code.contains("pub struct BatchUpdateAuthorParams<'a>"),
+        "expected params struct with <'a> in:\n{code}"
+    );
+    assert!(
+        code.contains("IntoIterator<Item = BatchUpdateAuthorParams<'a>>"),
+        "expected Item = BatchUpdateAuthorParams<'a> in:\n{code}"
+    );
+}
+
+#[test]
+fn snapshot_borrowed_copyfrom() {
+    let query = Query {
+        name: "CopyAuthors".to_string(),
+        cmd: ":copyfrom".to_string(),
+        text: "INSERT INTO authors (name, bio) VALUES ($1, $2)".to_string(),
+        insert_into_table: Some(Identifier {
+            name: "authors".to_string(),
+            ..Default::default()
+        })
+        .into(),
+        params: vec![
+            Parameter {
+                number: 1,
+                column: Some(make_author_column("name", "text", true)).into(),
+                ..Default::default()
+            },
+            Parameter {
+                number: 2,
+                column: Some(make_author_column("bio", "text", false)).into(),
+                ..Default::default()
+            },
+        ],
+        ..Default::default()
+    };
+    let bytes = make_request_with_options(vec![query], BORROWED_TEXT_OPTIONS);
+    let out = run_with_bytes(&bytes).expect("generate failed");
+    let resp = sqlc_gen_sqlx::plugin::GenerateResponse::decode_from_slice(&out).unwrap();
+    let code = String::from_utf8(resp.files[0].contents.clone()).unwrap();
+    assert_codegen_snapshot("borrowed_copyfrom", &code);
+    assert!(
+        code.contains("pub async fn copy_authors<'a, E: AsExecutor, I>"),
+        "expected 'a in fn signature in:\n{code}"
+    );
+    assert!(
+        code.contains("I: IntoIterator<Item = CopyAuthorsParams<'a>>"),
+        "expected Item with <'a> in where clause in:\n{code}"
+    );
+}
+
+#[test]
+fn snapshot_borrowed_with_custom_owned() {
+    let options =
+        br#"{"overrides":[{"db_type":"text","rs_type":"MyStr","borrowed_rs_type":"&MyStr"}]}"#;
+    let query = Query {
+        name: "GetByName".to_string(),
+        cmd: ":one".to_string(),
+        text: "SELECT id, name, bio FROM authors WHERE name = $1".to_string(),
+        columns: vec![
+            make_author_column("id", "int8", true),
+            make_author_column("name", "text", true),
+            make_author_column("bio", "text", false),
+        ],
+        params: vec![Parameter {
+            number: 1,
+            column: Some(make_author_column("name", "text", true)).into(),
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let bytes = make_request_with_options(vec![query], options);
+    let out = run_with_bytes(&bytes).expect("generate failed");
+    let resp = sqlc_gen_sqlx::plugin::GenerateResponse::decode_from_slice(&out).unwrap();
+    let code = String::from_utf8(resp.files[0].contents.clone()).unwrap();
+    assert_codegen_snapshot("borrowed_with_custom_owned", &code);
+    assert!(
+        code.contains("name: &MyStr"),
+        "param uses borrowed override in:\n{code}"
+    );
+    assert!(
+        code.contains("pub name: MyStr"),
+        "row uses custom owned rs_type in:\n{code}"
     );
 }

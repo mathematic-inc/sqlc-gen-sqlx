@@ -7,6 +7,7 @@ mod batch;
 mod composites;
 mod copyfrom;
 mod enums;
+pub(crate) mod lifetimes;
 mod query;
 
 pub fn generate(request: &GenerateRequestView<'_>, config: &Config) -> Result<String, Error> {

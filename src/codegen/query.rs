@@ -3,11 +3,12 @@ use quote::{format_ident, quote};
 use syn::parse_str;
 
 use crate::{
+    codegen::lifetimes::inject_lifetime,
     config::Config,
     error::Error,
     ident::{field_ident, query_params_name, to_pascal_case, to_snake_case, type_ident},
     plugin::{ColumnView, ParameterView, QueryView},
-    types::{ResolvedType, TypeMap},
+    types::{ColumnOverride, ResolvedType, TypeMap},
 };
 
 /// Resolved parameter: Rust identifier + type.
@@ -17,6 +18,21 @@ pub(crate) struct Param {
     pub(crate) source_name: String,
     pub(crate) is_slice: bool,
     pub(crate) resolved: ResolvedType,
+}
+
+impl Param {
+    /// Parameter-position type: borrowed form if the resolver produced one,
+    /// otherwise the owned form. Lifetimes are anonymous (`&str`).
+    pub(crate) fn param_type(&self) -> &str {
+        self.resolved
+            .borrowed_rust_type
+            .as_deref()
+            .unwrap_or(&self.resolved.rust_type)
+    }
+
+    pub(crate) fn is_borrowed(&self) -> bool {
+        self.resolved.borrowed_rust_type.is_some()
+    }
 }
 
 /// Columns from an embedded table (`sqlc.embed(table)`), grouped together.
@@ -40,7 +56,7 @@ pub(crate) struct ResolvedColumnSet {
 pub(crate) fn resolve_params<'a>(
     params: impl Iterator<Item = &'a ParameterView<'a>>,
     type_map: &TypeMap,
-    col_overrides: &std::collections::HashMap<String, ResolvedType>,
+    col_overrides: &std::collections::HashMap<String, ColumnOverride>,
 ) -> Result<Vec<Param>, Error> {
     let mut out = Vec::new();
     for p in params {
@@ -86,7 +102,14 @@ pub(crate) fn resolve_params<'a>(
     Ok(out)
 }
 
-/// Emit a params struct when the query has ≥2 parameters.
+/// Whether any param in the set carries a borrowed type.
+pub(crate) fn any_borrowed(params: &[Param]) -> bool {
+    params.iter().any(Param::is_borrowed)
+}
+
+/// Emit a params struct when the query has ≥2 parameters. When any field is
+/// borrowed, the struct gains a `<'a>` lifetime parameter and each borrowed
+/// field references it.
 pub(crate) fn maybe_params_struct(
     query_name: &str,
     params: &[Param],
@@ -96,12 +119,17 @@ pub(crate) fn maybe_params_struct(
         return Ok(None);
     }
     let struct_name = type_ident(&query_params_name(query_name));
+    let has_borrowed = any_borrowed(params);
     let mut field_tokens = Vec::new();
     for p in params {
         let ident = &p.ident;
-        let ty: syn::Type = parse_str(&p.resolved.rust_type).map_err(|e| {
-            Error::Codegen(format!("invalid Rust type '{}': {e}", p.resolved.rust_type))
-        })?;
+        let ty_str = if let Some(borrowed) = &p.resolved.borrowed_rust_type {
+            inject_lifetime(borrowed, "'a")?
+        } else {
+            p.resolved.rust_type.clone()
+        };
+        let ty: syn::Type = parse_str(&ty_str)
+            .map_err(|e| Error::Codegen(format!("invalid Rust type '{ty_str}': {e}")))?;
         field_tokens.push(quote! { pub #ident: #ty, });
     }
     let mut derive_paths = Vec::new();
@@ -110,9 +138,14 @@ pub(crate) fn maybe_params_struct(
             parse_str(d).map_err(|e| Error::Codegen(format!("invalid derive path '{d}': {e}")))?;
         derive_paths.push(quote! { #path });
     }
+    let generics = if has_borrowed {
+        quote! { <'a> }
+    } else {
+        quote! {}
+    };
     let tokens = quote! {
         #[derive(Debug, Clone, #(#derive_paths),*)]
-        pub struct #struct_name {
+        pub struct #struct_name #generics {
             #(#field_tokens)*
         }
     };
@@ -292,11 +325,13 @@ pub(crate) fn sql_const(query_name: &str, sql: &str) -> (TokenStream, proc_macro
     (tokens, const_name)
 }
 
-/// Resolve result columns into flat fields and embedded groups.
+/// Resolve result columns into flat fields and embedded groups. Row positions
+/// always use the owned form, so any `borrowed_rust_type` on the resolution
+/// is intentionally ignored downstream.
 pub(crate) fn resolve_columns<'a>(
     cols: impl Iterator<Item = &'a ColumnView<'a>>,
     type_map: &TypeMap,
-    col_overrides: &std::collections::HashMap<String, ResolvedType>,
+    col_overrides: &std::collections::HashMap<String, ColumnOverride>,
 ) -> Result<ResolvedColumnSet, Error> {
     let mut flat: Vec<(proc_macro2::Ident, ResolvedType)> = Vec::new();
     let mut embedded_groups: Vec<(String, Vec<(proc_macro2::Ident, ResolvedType)>)> = Vec::new();
@@ -408,6 +443,11 @@ pub(crate) fn row_struct(
 
 /// Build the parameters portion of a query function signature.
 /// Returns `(params_struct_tokens, arg_ident, fn_params_tokens)`.
+///
+/// When the query has a params struct and any field is borrowed, the
+/// fn-signature reference uses `<'_>` to elide the struct's `'a` (Rust 2024
+/// anonymous lifetime in type paths). Single-param functions rely on
+/// classical lifetime elision and take the borrowed type directly.
 pub(crate) fn build_fn_params(
     query_name: &str,
     params: &[Param],
@@ -418,17 +458,22 @@ pub(crate) fn build_fn_params(
         let (struct_tokens, struct_ident) = maybe_params_struct(query_name, params, derives)?
             .expect("guarded by params.len() >= 2 check above");
         let arg = format_ident!("arg");
+        let arg_ty = if any_borrowed(params) {
+            quote! { #struct_ident<'_> }
+        } else {
+            quote! { #struct_ident }
+        };
         Ok((
             Some(struct_tokens),
             Some(arg.clone()),
-            quote! { #arg: #struct_ident },
+            quote! { #arg: #arg_ty },
         ))
     } else if params.len() == 1 {
         let p = &params[0];
         let ident = &p.ident;
-        let ty: syn::Type = parse_str(&p.resolved.rust_type).map_err(|e| {
-            Error::Codegen(format!("invalid Rust type '{}': {e}", p.resolved.rust_type))
-        })?;
+        let ty_str = p.param_type();
+        let ty: syn::Type = parse_str(ty_str)
+            .map_err(|e| Error::Codegen(format!("invalid Rust type '{ty_str}': {e}")))?;
         Ok((None, None, quote! { #ident: #ty }))
     } else {
         Ok((None, None, quote! {}))
@@ -440,7 +485,7 @@ pub fn gen_one(
     query: &QueryView<'_>,
     type_map: &TypeMap,
     config: &Config,
-    col_overrides: &std::collections::HashMap<String, ResolvedType>,
+    col_overrides: &std::collections::HashMap<String, ColumnOverride>,
 ) -> Result<TokenStream, Error> {
     let params = resolve_params(query.params.iter(), type_map, col_overrides)?;
     let columns = resolve_columns(query.columns.iter(), type_map, col_overrides)?;
@@ -492,7 +537,7 @@ pub fn gen_many(
     query: &QueryView<'_>,
     type_map: &TypeMap,
     config: &Config,
-    col_overrides: &std::collections::HashMap<String, ResolvedType>,
+    col_overrides: &std::collections::HashMap<String, ColumnOverride>,
 ) -> Result<TokenStream, Error> {
     let params = resolve_params(query.params.iter(), type_map, col_overrides)?;
     let columns = resolve_columns(query.columns.iter(), type_map, col_overrides)?;
@@ -542,7 +587,7 @@ pub fn gen_execrows(
     query: &QueryView<'_>,
     type_map: &TypeMap,
     config: &Config,
-    col_overrides: &std::collections::HashMap<String, ResolvedType>,
+    col_overrides: &std::collections::HashMap<String, ColumnOverride>,
 ) -> Result<TokenStream, Error> {
     let params = resolve_params(query.params.iter(), type_map, col_overrides)?;
     let fn_name = format_ident!("{}", to_snake_case(query.name));
@@ -582,7 +627,7 @@ pub fn gen_execresult(
     query: &QueryView<'_>,
     type_map: &TypeMap,
     config: &Config,
-    col_overrides: &std::collections::HashMap<String, ResolvedType>,
+    col_overrides: &std::collections::HashMap<String, ColumnOverride>,
 ) -> Result<TokenStream, Error> {
     let params = resolve_params(query.params.iter(), type_map, col_overrides)?;
     let fn_name = format_ident!("{}", to_snake_case(query.name));
@@ -620,7 +665,7 @@ pub fn gen_exec(
     query: &QueryView<'_>,
     type_map: &TypeMap,
     config: &Config,
-    col_overrides: &std::collections::HashMap<String, ResolvedType>,
+    col_overrides: &std::collections::HashMap<String, ColumnOverride>,
 ) -> Result<TokenStream, Error> {
     let params = resolve_params(query.params.iter(), type_map, col_overrides)?;
     let fn_name = format_ident!("{}", to_snake_case(query.name));
@@ -670,7 +715,7 @@ pub fn gen_execlastid(
     query: &QueryView<'_>,
     type_map: &TypeMap,
     config: &Config,
-    col_overrides: &std::collections::HashMap<String, ResolvedType>,
+    col_overrides: &std::collections::HashMap<String, ColumnOverride>,
 ) -> Result<TokenStream, Error> {
     let params = resolve_params(query.params.iter(), type_map, col_overrides)?;
     let fn_name = format_ident!("{}", to_snake_case(query.name));
