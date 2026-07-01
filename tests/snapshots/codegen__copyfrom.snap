@@ -48,7 +48,7 @@ pub struct CopyAuthorsParams {
     pub name: String,
     pub bio: Option<String>,
 }
-const COPY_AUTHORS: &str = "INSERT INTO authors (name, bio) ";
+pub const COPY_AUTHORS: &str = "INSERT INTO authors (name, bio) ";
 const COPY_AUTHORS_BATCH_SIZE: usize = 32767usize;
 pub async fn copy_authors<E: AsExecutor, I>(
     mut db: E,

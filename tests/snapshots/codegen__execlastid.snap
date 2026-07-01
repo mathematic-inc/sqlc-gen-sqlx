@@ -43,7 +43,7 @@ impl<T: AsExecutor + ?Sized> AsExecutor for &mut T {
         (**self).as_executor()
     }
 }
-const CREATE_AUTHOR: &str = "INSERT INTO authors (name) VALUES ($1) RETURNING id";
+pub const CREATE_AUTHOR: &str = "INSERT INTO authors (name) VALUES ($1) RETURNING id";
 pub async fn create_author<E: AsExecutor>(
     mut db: E,
     name: String,
