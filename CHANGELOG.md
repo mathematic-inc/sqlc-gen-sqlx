@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.2.1...v0.2.2) (2026-07-01)
+
+
+### Features
+
+* Export generated SQL constants ([597babb](https://github.com/mathematic-inc/sqlc-gen-sqlx/commit/597babb1a5905fdaaceb681971418e976669cb70))
+
 ## [0.2.1](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.2.0...v0.2.1) (2026-05-18)
 
 
