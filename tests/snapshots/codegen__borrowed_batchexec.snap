@@ -43,7 +43,7 @@ impl<T: AsExecutor + ?Sized> AsExecutor for &mut T {
         (**self).as_executor()
     }
 }
-const BATCH_DELETE_BY_NAME: &str = "DELETE FROM authors WHERE name = $1";
+pub const BATCH_DELETE_BY_NAME: &str = "DELETE FROM authors WHERE name = $1";
 pub fn batch_delete_by_name<'a, E, I>(
     db: E,
     items: I,

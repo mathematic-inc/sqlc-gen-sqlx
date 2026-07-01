@@ -320,7 +320,7 @@ pub(crate) fn dynamic_bind_statements(
 pub(crate) fn sql_const(query_name: &str, sql: &str) -> (TokenStream, proc_macro2::Ident) {
     let const_name = format_ident!("{}", to_snake_case(query_name).to_uppercase());
     let tokens = quote! {
-        const #const_name: &str = #sql;
+        pub const #const_name: &str = #sql;
     };
     (tokens, const_name)
 }

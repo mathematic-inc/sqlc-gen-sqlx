@@ -43,7 +43,7 @@ impl<T: AsExecutor + ?Sized> AsExecutor for &mut T {
         (**self).as_executor()
     }
 }
-const GET_BY_NAME: &str = "SELECT id, name, bio FROM authors WHERE name = $1";
+pub const GET_BY_NAME: &str = "SELECT id, name, bio FROM authors WHERE name = $1";
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct GetByNameRow {
     pub id: i64,

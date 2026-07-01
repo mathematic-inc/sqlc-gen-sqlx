@@ -48,7 +48,7 @@ pub struct UpdateAuthorParams<'a> {
     pub name: &'a str,
     pub bio: Option<&'a str>,
 }
-const UPDATE_AUTHOR: &str = "UPDATE authors SET name = $1, bio = $2";
+pub const UPDATE_AUTHOR: &str = "UPDATE authors SET name = $1, bio = $2";
 pub async fn update_author<E: AsExecutor>(
     mut db: E,
     arg: UpdateAuthorParams<'_>,
