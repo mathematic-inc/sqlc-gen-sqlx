@@ -43,7 +43,7 @@ impl<T: AsExecutor + ?Sized> AsExecutor for &mut T {
         (**self).as_executor()
     }
 }
-const LIST_BY_TAGS: &str = "DELETE FROM authors WHERE name = ANY($1)";
+pub const LIST_BY_TAGS: &str = "DELETE FROM authors WHERE name = ANY($1)";
 pub async fn list_by_tags<E: AsExecutor>(
     mut db: E,
     tags: &[String],

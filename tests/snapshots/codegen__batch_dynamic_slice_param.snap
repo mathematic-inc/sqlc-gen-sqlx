@@ -43,7 +43,7 @@ impl<T: AsExecutor + ?Sized> AsExecutor for &mut T {
         (**self).as_executor()
     }
 }
-const BATCH_LIST_AUTHORS_BY_DYNAMIC_IDS: &str = "SELECT id, name, bio FROM authors WHERE id IN ($1)";
+pub const BATCH_LIST_AUTHORS_BY_DYNAMIC_IDS: &str = "SELECT id, name, bio FROM authors WHERE id IN ($1)";
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct BatchListAuthorsByDynamicIdsRow {
     pub id: i64,

@@ -48,7 +48,7 @@ pub struct UpdateAuthorNamedParamsParams {
     pub set_name: String,
     pub author_id: i64,
 }
-const UPDATE_AUTHOR_NAMED_PARAMS: &str = "UPDATE authors SET name = $1 WHERE id = $2";
+pub const UPDATE_AUTHOR_NAMED_PARAMS: &str = "UPDATE authors SET name = $1 WHERE id = $2";
 pub async fn update_author_named_params<E: AsExecutor>(
     mut db: E,
     arg: UpdateAuthorNamedParamsParams,
