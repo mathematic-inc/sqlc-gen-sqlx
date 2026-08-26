@@ -189,7 +189,7 @@ Batch methods generate `Stream`-returning APIs and reference `futures_core` and 
 
 ## Contributing
 
-We review change proposals in Discussions before code. [Start a Discussion](../../discussions/new) and wait for a maintainer's review. If we accept the proposal, a Mathematic maintainer or agent will implement it and open the pull request. GitHub limits pull request creation to Mathematic maintainers and repository collaborators with write, maintain, or admin access, plus authorized maintenance agents. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full process.
+We review change proposals in Discussions before code. [Start a Discussion](../../discussions/new) and wait for a maintainer's review. If we accept the proposal, a Mathematic maintainer or agent will implement it and open the pull request. When Mathematic implements a proposal, the implementation PR will link to the Discussion and credit its original author. GitHub limits pull request creation to Mathematic maintainers and repository collaborators with write, maintain, or admin access, plus authorized maintenance agents. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full process.
 
 ## License
 
