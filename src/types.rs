@@ -335,10 +335,9 @@ impl TypeMap {
             // an override or fall back to a default).
             let owned_inner = if let Some(owned) = &ovr.owned {
                 owned.clone()
-            } else if let Some(resolved) = self.resolve_pg_type_dims(pg_type, false, 0) {
-                resolved.rust_type
             } else {
-                return None;
+                let resolved = self.resolve_pg_type_dims(pg_type, false, 0)?;
+                resolved.rust_type
             };
             let owned = wrap_owned(&owned_inner, nullable, array_dims);
             let borrowed = ovr

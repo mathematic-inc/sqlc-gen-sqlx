@@ -1,45 +1,45 @@
-[workspace]
-members = [".", "examples/*"]
-resolver = "2"
-
-[workspace.dependencies]
-sqlx = { version = "0.8", features = ["postgres", "runtime-tokio", "uuid", "chrono", "ipnetwork", "mac_address", "bit-vec", "bigdecimal"] }
-tokio = { version = "1", features = ["full"] }
-serde_json = "1"
-
 [package]
 name = "sqlc-gen-sqlx"
 version = "0.2.2"
 edition = "2024"
-license = "MIT OR Apache-2.0"
 description = "A sqlc plugin that generates type-safe sqlx Rust code from SQL queries."
 repository = "https://github.com/mathematic-inc/sqlc-gen-sqlx"
+license = "MIT OR Apache-2.0"
 
-[[bin]]
-name = "sqlc-gen-sqlx"
-path = "src/main.rs"
+[workspace]
+resolver = "2"
+members = [".", "examples/*"]
+
+[workspace.dependencies]
+serde_json = "1"
+sqlx = { version = "0.9", features = ["bigdecimal", "bit-vec", "chrono", "ipnetwork", "mac_address", "postgres", "runtime-tokio", "uuid"] }
+tokio = { version = "1", features = ["full"] }
 
 [lib]
 name = "sqlc_gen_sqlx"
 path = "src/lib.rs"
 
-[profile.release]
-opt-level = "z"
-lto = true
-strip = "symbols"
+[[bin]]
+name = "sqlc-gen-sqlx"
+path = "src/main.rs"
 
 [dependencies]
-buffa = "0.3"
-convert_case = "0.8"
-prettyplease = "0.2"
+buffa = "0.9"
+convert_case = "0.11"
+prettyplease = "0.3"
 proc-macro2 = "1"
 quote = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = { workspace = true }
-syn = { version = "2", features = ["full", "visit-mut"] }
+syn = { version = "3", features = ["full", "visit-mut"] }
 
 [dev-dependencies]
 insta = { version = "1", features = ["filters"] }
 tempfile = "3"
 testcontainers-modules = { version = "0.15", features = ["postgres"] }
 tokio = { workspace = true }
+
+[profile.release]
+opt-level = "z"
+strip = "symbols"
+lto = true

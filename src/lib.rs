@@ -4,8 +4,11 @@ pub mod config;
 pub mod emit;
 pub mod error;
 pub mod ident;
-pub mod plugin;
 pub mod types;
+
+#[path = "mod.rs"]
+mod generated;
+pub use generated::plugin;
 
 pub use error::Error;
 

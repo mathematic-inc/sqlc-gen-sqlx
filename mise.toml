@@ -1,58 +1,44 @@
+[settings]
+all_compile = false
+cargo.binstall_native = true
+idiomatic_version_file_enable_tools = ["node", "pnpm", "python", "ruff", "rust"]
+npm.package_manager = "npm"
+
 [tools]
-rust = "stable"
-
-[tasks.build]
-description = "Build WASM plugin (debug)"
-run = "cargo build --target wasm32-wasip1"
-
-[tasks.build-release]
-description = "Build WASM plugin (release)"
-run = "cargo build --target wasm32-wasip1 --release"
-
-[tasks.test]
-description = "Run all tests"
-run = "cargo test --workspace"
-
-[tasks.lint]
-description = "Run clippy"
-run = "cargo clippy --workspace --all-targets -- -D warnings"
-
-[tasks.fmt]
-description = "Format code"
-run = "cargo fmt --all"
-
-[tasks.fmt-check]
-description = "Check formatting (CI)"
-run = "cargo fmt --all --check"
-
-[tasks.proto-sync]
-description = "Sync codegen.proto from sqlc upstream"
-run = "bash scripts/proto-sync.sh"
-
-[tasks.proto-gen]
-description = "Regenerate buffa bindings from proto (output is checked in)"
-run = "buf generate"
-
-[tasks.proto-check]
-description = "Verify checked-in proto bindings are up-to-date (CI)"
-run = """
-buf generate
-git diff --exit-code src/plugin/
-"""
-
-[tasks.generate]
-description = "Rebuild WASM and run sqlc generate against examples"
-run = """
-#!/usr/bin/env bash
-set -euo pipefail
-cargo build --target wasm32-wasip1
-if command -v sha256sum >/dev/null 2>&1; then
-  SHA=$(sha256sum target/wasm32-wasip1/debug/sqlc-gen-sqlx.wasm | awk '{print $1}')
-else
-  SHA=$(shasum -a 256 target/wasm32-wasip1/debug/sqlc-gen-sqlx.wasm | awk '{print $1}')
-fi
-# Update sqlc.yaml in-place with the freshly computed sha256
-sed -i.bak "s|sha256:.*|sha256: \\\"${SHA}\\\"|" sqlc.yaml && rm -f sqlc.yaml.bak
-sqlc generate
-cargo fmt --all
-"""
+actionlint = "1.7.12"
+buf = "1.72.0"
+ghalint = "1.5.6"
+gitleaks = "8.30.1"
+harper-cli = "2.8.0"
+hk = "1.56.1"
+jq = "1.8.2"
+lychee = "0.24.2"
+pinact = "4.1.1"
+protoc = "36.0"
+python = "3.14.7"
+rumdl = "0.2.60"
+rust = { version = "1.98.0", profile = "minimal", components = [
+  "clippy",
+  "rustfmt",
+] }
+shellcheck = "0.11.0"
+shfmt = "3.13.1"
+tombi = "1.4.1"
+typos = "1.49.0"
+uv = "0.12.6"
+zizmor = "1.29.0"
+"aqua:EmbarkStudios/cargo-deny" = { version = "0.20.2", depends = ["rust"] }
+"aqua:anordal/shellharden" = "4.3.2"
+"aqua:apple/pkl" = "0.32.1"
+"aqua:owenlamont/ryl" = "0.21.0"
+"aqua:sqlc" = "1.31.1"
+# Compile generators from source so codegen and runtime stay in lockstep.
+"cargo:protoc-gen-buffa" = { version = "0.9.1", default-features = false, depends = [
+  "rust",
+] }
+"cargo:protoc-gen-buffa-packaging" = { version = "0.9.1", default-features = false, depends = [
+  "rust",
+  "cargo:protoc-gen-buffa",
+] }
+"github:mongodb/kingfisher" = "2.0.0"
+"pipx:yamllint" = { version = "1.38.0", depends = ["python", "uv"] }
