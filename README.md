@@ -1,6 +1,6 @@
 # sqlc-gen-sqlx
 
-A [sqlc](https://sqlc.dev) plugin that generates type-safe [sqlx](https://github.com/launchbadge/sqlx) Rust code from SQL queries.
+A [sqlc](https://sqlc.dev) plugin that generates type-safe [sqlx](https://github.com/transact-rs/sqlx) Rust code from SQL queries.
 
 ## What it generates
 
@@ -36,8 +36,8 @@ version: "2"
 plugins:
   - name: sqlc-gen-sqlx
     wasm:
-      url: https://github.com/your-org/sqlc-gen-sqlx/releases/download/v0.1.0/sqlc-gen-sqlx.wasm
-      sha256: "<sha256 of the wasm file>"
+      url: https://github.com/mathematic-inc/sqlc-gen-sqlx/releases/download/v0.2.2/sqlc-gen-sqlx.wasm
+      sha256: "b03b1b7fcf1887cbb1cdbdd2b83c0252badd92060764fac0017c0aaa22e4c923"
 sql:
   - engine: postgresql
     queries: queries.sql
@@ -189,7 +189,7 @@ Batch methods generate `Stream`-returning APIs and reference `futures_core` and 
 
 ## Contributing
 
-We review change proposals in Discussions before code. [Start a Discussion](../../discussions/new) and wait for a maintainer's review. If we accept the proposal, a Mathematic maintainer or agent will implement it and open the pull request. When Mathematic implements a proposal, the implementation PR will link to the Discussion and credit its original author. GitHub limits pull request creation to Mathematic maintainers and repository collaborators with write, maintain, or admin access, plus authorized maintenance agents. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full process.
+We review change proposals in Discussions before code. [Start a Discussion](https://github.com/mathematic-inc/sqlc-gen-sqlx/discussions/new) and wait for a maintainer's review. If we accept the proposal, a Mathematic maintainer or agent will implement it and open the pull request. When Mathematic implements a proposal, the implementation PR will link to the Discussion and credit its original author. GitHub limits pull request creation to Mathematic maintainers and repository collaborators with write, maintain, or admin access, plus authorized maintenance agents. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full process.
 
 ## License
 

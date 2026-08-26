@@ -5,9 +5,19 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
     services:
       postgres:
         image: postgres:17-alpine
@@ -24,26 +34,22 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install sqlc
-        uses: sqlc-dev/setup-sqlc@v5
+        uses: sqlc-dev/setup-sqlc@bac53b7fb28c039a6c7f5736fd1e89744021bdd6 # v5.0.0
         with:
-          sqlc-version: "1.30.0"
+          sqlc-version: "1.31.1"
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
         with:
           targets: wasm32-wasip1
 
       - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-
-      - name: Format check
-        run: cargo fmt --all --check
-
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
 
       - name: Snapshot tests
         run: cargo test --workspace
@@ -58,20 +64,29 @@ jobs:
         env:
           DATABASE_URL: postgres://sqlc:sqlc@localhost:5432/sqlc_test
 
+      - name: Verify package
+        run: cargo package --locked
+
   proto-check:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install buf
-        uses: bufbuild/buf-action@v1
+        uses: bufbuild/buf-action@8c6a16e16f12ba20b6470afa9c2ba9b5ba8c97c3 # v1.5.0
         with:
           setup_only: true
 
       - name: Install protoc-gen-buffa
-        run: cargo install --locked protoc-gen-buffa@0.3.0 protoc-gen-buffa-packaging@0.3.0
+        run: cargo install protoc-gen-buffa@0.9.1 protoc-gen-buffa-packaging@0.9.1
 
       - name: Verify proto bindings are up to date
         run: |
           buf generate
-          git diff --exit-code src/plugin/
+          cargo fmt --all
+          git diff --exit-code -- src
