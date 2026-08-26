@@ -12,4 +12,4 @@ If we accept the proposal, a Mathematic maintainer or one of our agents will imp
 
 ## Pull requests
 
-Only repository owners, Mathematic organization members, repository collaborators, and the approved maintenance bots Renovate and Dependabot may open pull requests. A GitHub workflow comments on and closes pull requests from all other accounts automatically.
+GitHub limits pull request creation to Mathematic maintainers and repository collaborators with write, maintain, or admin access, plus authorized maintenance agents.
