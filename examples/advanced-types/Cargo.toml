@@ -6,7 +6,7 @@ publish = false
 
 [dependencies]
 bigdecimal = "0.4"
-bit-vec = "0.8"
+bit-vec = "0.10"
 chrono = "0.4"
 sqlx = { workspace = true }
 tokio = { workspace = true }
