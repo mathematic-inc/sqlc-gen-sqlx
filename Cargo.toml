@@ -1,5 +1,9 @@
 [package]
 name = "sqlc-gen-sqlx"
+# When releasing to crates.io:
+# - Remove path dependencies (if any)
+# - Update CHANGELOG.md
+# - Create a v0.2.x tag
 version = "0.2.3"
 edition = "2024"
 description = "A sqlc plugin that generates type-safe sqlx Rust code from SQL queries."
