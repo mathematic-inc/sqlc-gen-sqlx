@@ -504,7 +504,10 @@ fn snapshot_range_types() {
     let code = String::from_utf8(resp.files[0].contents.clone()).unwrap();
     assert_codegen_snapshot("range_types", &code);
     assert!(code.contains("PgRange"), "expected PgRange in:\n{code}");
-    assert!(code.contains("BitVec"), "expected BitVec in:\n{code}");
+    assert!(
+        code.contains("sqlx::types::BitVec"),
+        "expected SQLx BitVec in:\n{code}"
+    );
 }
 
 #[test]

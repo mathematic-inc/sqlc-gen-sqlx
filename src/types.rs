@@ -202,7 +202,7 @@ impl TypeMap {
 
         // Bit types
         for n in ["bit", "varbit", "pg_catalog.varbit"] {
-            defaults.insert(n, ("bit_vec::BitVec", false));
+            defaults.insert(n, ("sqlx::types::BitVec", false));
         }
 
         let mut type_overrides: HashMap<String, OverrideEntry> = HashMap::new();

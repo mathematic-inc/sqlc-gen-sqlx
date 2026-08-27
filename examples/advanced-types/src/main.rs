@@ -23,7 +23,7 @@ async fn test_advanced_types_roundtrip() {
         .await
         .unwrap();
 
-    let flags = bit_vec::BitVec::from_bytes(&[0b10101010]);
+    let flags = sqlx::types::BitVec::from_bytes(&[0b10101010]);
     let now = chrono::Utc::now();
     let later = now + chrono::Duration::hours(1);
     let window = sqlx::postgres::types::PgRange::from((
