@@ -1,6 +1,6 @@
 [package]
 name = "sqlc-gen-sqlx"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2024"
 description = "A sqlc plugin that generates type-safe sqlx Rust code from SQL queries."
 repository = "https://github.com/mathematic-inc/sqlc-gen-sqlx"

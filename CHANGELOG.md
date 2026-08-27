@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.2.2...v0.2.3) (2026-08-27)
+
+
+### Bug Fixes
+
+* **deps:** Use SQLx BitVec re-export ([#27](https://github.com/mathematic-inc/sqlc-gen-sqlx/issues/27)) ([28ed046](https://github.com/mathematic-inc/sqlc-gen-sqlx/commit/28ed046c77b5b3534769512e6d0d95a06716ac51))
+
 ## [0.2.2](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.2.1...v0.2.2) (2026-07-01)
 
 
