@@ -4,7 +4,7 @@ name = "sqlc-gen-sqlx"
 # - Remove path dependencies (if any)
 # - Update CHANGELOG.md
 # - Create a v0.2.x tag
-version = "0.2.3"
+version = "0.2.4"
 edition = "2024"
 rust-version = "1.94"
 description = "A sqlc plugin that generates type-safe sqlx Rust code from SQL queries."
