@@ -48,7 +48,7 @@ pub const GET_EVENT_WINDOW: &str = "SELECT id, window, flags FROM events WHERE i
 pub struct GetEventWindowRow {
     pub id: i64,
     pub window: sqlx::postgres::types::PgRange<chrono::DateTime<chrono::Utc>>,
-    pub flags: bit_vec::BitVec,
+    pub flags: sqlx::types::BitVec,
 }
 pub async fn get_event_window<E: AsExecutor>(
     mut db: E,

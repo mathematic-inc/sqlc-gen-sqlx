@@ -157,7 +157,7 @@ directly without re-collecting.
 | `tsrange` | `sqlx::postgres::types::PgRange<chrono::NaiveDateTime>` |
 | `tstzrange` | `sqlx::postgres::types::PgRange<chrono::DateTime<chrono::Utc>>` |
 | `daterange` | `sqlx::postgres::types::PgRange<chrono::NaiveDate>` |
-| `bit` / `varbit` | `bit_vec::BitVec` |
+| `bit` / `varbit` | `sqlx::types::BitVec` |
 | PostgreSQL ENUM | generated Rust enum |
 | PostgreSQL composite | generated Rust struct |
 

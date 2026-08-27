@@ -44,7 +44,7 @@ const GET_EVENT: &str = "SELECT id, name, flags, event_window FROM events WHERE 
 pub struct GetEventRow {
     pub id: i64,
     pub name: String,
-    pub flags: bit_vec::BitVec,
+    pub flags: sqlx::types::BitVec,
     pub event_window: sqlx::postgres::types::PgRange<chrono::DateTime<chrono::Utc>>,
 }
 pub async fn get_event<E: AsExecutor>(mut db: E, id: i64) -> Result<GetEventRow, sqlx::Error> {
@@ -58,7 +58,7 @@ const LIST_EVENTS: &str = "SELECT id, name, flags, event_window FROM events";
 pub struct ListEventsRow {
     pub id: i64,
     pub name: String,
-    pub flags: bit_vec::BitVec,
+    pub flags: sqlx::types::BitVec,
     pub event_window: sqlx::postgres::types::PgRange<chrono::DateTime<chrono::Utc>>,
 }
 pub async fn list_events<E: AsExecutor>(mut db: E) -> Result<Vec<ListEventsRow>, sqlx::Error> {
