@@ -36,8 +36,8 @@ version: "2"
 plugins:
   - name: sqlc-gen-sqlx
     wasm:
-      url: https://github.com/mathematic-inc/sqlc-gen-sqlx/releases/download/v0.2.2/sqlc-gen-sqlx.wasm
-      sha256: "b03b1b7fcf1887cbb1cdbdd2b83c0252badd92060764fac0017c0aaa22e4c923"
+      url: https://github.com/mathematic-inc/sqlc-gen-sqlx/releases/download/v0.2.3/sqlc-gen-sqlx.wasm
+      sha256: "2ff3fdf8fa12c5eb0e399eec59287989f95cdab9969ca86fa9c0c4e6fcab54e1"
 sql:
   - engine: postgresql
     queries: queries.sql
