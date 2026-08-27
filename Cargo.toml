@@ -6,6 +6,7 @@ name = "sqlc-gen-sqlx"
 # - Create a v0.2.x tag
 version = "0.2.3"
 edition = "2024"
+rust-version = "1.94"
 description = "A sqlc plugin that generates type-safe sqlx Rust code from SQL queries."
 repository = "https://github.com/mathematic-inc/sqlc-gen-sqlx"
 license = "MIT OR Apache-2.0"
