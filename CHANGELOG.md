@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.4](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.2.3...v0.2.4) (2026-08-27)
+
+
+### Bug Fixes
+
+* Declare Rust 1.94 MSRV ([#35](https://github.com/mathematic-inc/sqlc-gen-sqlx/issues/35)) ([68931e5](https://github.com/mathematic-inc/sqlc-gen-sqlx/commit/68931e5ba8b222c046a8d9ffece4976d8c421c50))
+
 ## [0.2.3](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.2.2...v0.2.3) (2026-08-27)
 
 ### Bug Fixes
