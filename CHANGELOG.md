@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.5](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.2.4...v0.2.5) (2026-09-05)
+
+
+### Bug Fixes
+
+* **ci:** Harden release workflows and repository checks ([#38](https://github.com/mathematic-inc/sqlc-gen-sqlx/issues/38)) ([b4f44f8](https://github.com/mathematic-inc/sqlc-gen-sqlx/commit/b4f44f8c542ae16ef62a8f5fa1cd8fd12c3b46fd))
+
 ## [0.2.4](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.2.3...v0.2.4) (2026-08-27)
 
 
