@@ -103,7 +103,7 @@ jobs:
           setup_only: true
 
       - name: Install protoc-gen-buffa
-        run: cargo install protoc-gen-buffa@0.9.1 protoc-gen-buffa-packaging@0.9.1
+        run: cargo install --locked protoc-gen-buffa@0.9.1 protoc-gen-buffa-packaging@0.9.1
 
       - name: Verify proto bindings are up to date
         run: |
