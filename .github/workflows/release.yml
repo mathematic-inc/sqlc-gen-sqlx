@@ -72,6 +72,7 @@ jobs:
           DATABASE_URL: postgres://sqlc:sqlc@localhost:5432/sqlc_test
 
   publish-release:
+    environment: release
     needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 15
