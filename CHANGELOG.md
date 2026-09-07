@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.6](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.2.5...v0.2.6) (2026-09-07)
+
+
+### Bug Fixes
+
+* **release:** Publish native binaries for all supported platforms ([#40](https://github.com/mathematic-inc/sqlc-gen-sqlx/issues/40)) ([a7295b8](https://github.com/mathematic-inc/sqlc-gen-sqlx/commit/a7295b81251ac89d1636cce0702a1690eb506670))
+
 ## [0.2.5](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.2.4...v0.2.5) (2026-09-05)
 
 
