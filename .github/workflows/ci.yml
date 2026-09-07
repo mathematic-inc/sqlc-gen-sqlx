@@ -110,3 +110,9 @@ jobs:
           buf generate
           cargo fmt --all
           git diff --exit-code -- src
+
+  prebuilt:
+    permissions:
+      contents: read
+    name: Verify prebuilt distribution
+    uses: ./.github/workflows/prebuilt.yml
