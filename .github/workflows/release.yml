@@ -15,6 +15,9 @@ concurrency:
   group: release-${{ github.workflow }}-${{ inputs.tag || github.ref }}
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -71,13 +74,23 @@ jobs:
         env:
           DATABASE_URL: postgres://sqlc:sqlc@localhost:5432/sqlc_test
 
+  prebuilt:
+    permissions:
+      contents: read
+    needs: verify
+    uses: ./.github/workflows/prebuilt.yml
+    with:
+      ref: ${{ inputs.tag || github.sha }}
+
   publish-release:
     environment: release
-    needs: verify
+    needs: [verify, prebuilt]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 
@@ -87,6 +100,13 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
           ref: ${{ inputs.tag || github.ref }}
+
+      - name: Download native archives
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: binary-*
+          path: dist
+          merge-multiple: true
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
@@ -105,6 +125,11 @@ jobs:
           else
             shasum -a 256 dist/sqlc-gen-sqlx.wasm > dist/sqlc-gen-sqlx.wasm.sha256
           fi
+
+      - name: Attest native archives
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*
 
       - name: Ensure GitHub release exists
         env:
@@ -131,8 +156,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release upload "${RELEASE_TAG}" \
-            dist/sqlc-gen-sqlx.wasm \
-            dist/sqlc-gen-sqlx.wasm.sha256 \
+            dist/* \
             --clobber
 
   publish-crate:
@@ -165,3 +189,13 @@ jobs:
         run: cargo publish --locked
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-io-auth.outputs.token }}
+
+  verify-install:
+    permissions:
+      contents: read
+    name: Verify published installations
+    needs: [publish-crate]
+    uses: ./.github/workflows/prebuilt.yml
+    with:
+      verify-install: true
+      ref: ${{ inputs.tag || github.sha }}

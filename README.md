@@ -2,6 +2,42 @@
 
 A [sqlc](https://sqlc.dev) plugin that generates type-safe [sqlx](https://github.com/transact-rs/sqlx) Rust code from SQL queries.
 
+## Prebuilt installation
+
+Release archives contain the executable and install without a Rust compiler.
+Install with cargo-binstall, with source compilation disabled:
+
+```sh
+cargo binstall --disable-strategies compile sqlc-gen-sqlx
+```
+
+Or declare the GitHub release directly in `mise.toml`:
+
+```toml
+[tools]
+"github:mathematic-inc/sqlc-gen-sqlx" = "latest"
+```
+
+Run `mise install` to download and activate the executable. No custom mise plugin
+is required. The Cargo backend (`cargo:sqlc-gen-sqlx`) also supports these releases;
+set `cargo.binstall_only = true` to reject source compilation.
+
+| Platform | Architectures | Archive |
+| --- | --- | --- |
+| macOS | x64, ARM64 | `.tar.gz` |
+| Linux GNU (glibc 2.35 or newer) | x64, ARM64 | `.tar.gz` |
+| Linux musl | x64, ARM64 | `.tar.gz` |
+| Windows MSVC | x64, ARM64 | `.zip` |
+
+Every archive has a SHA-256 sidecar and GitHub build provenance. CI builds all
+eight targets and runs the extracted executables on the matching architecture.
+After publication, the release workflow installs through cargo-binstall and mise
+and runs both installations. A missing prebuilt binary fails the release checks.
+
+The release also includes `sqlc-gen-sqlx.wasm`. Continue using `plugins[].wasm`
+with its URL and checksum for sqlc's WASM plugin mode. The native executable
+installed above is used through `plugins[].process.cmd: sqlc-gen-sqlx` instead.
+
 ## What it generates
 
 For each SQL query annotated with a sqlc command, the plugin emits:
