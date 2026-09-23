@@ -508,7 +508,7 @@ pub fn gen_one(
         quote! {
             pub async fn #fn_name<E: AsExecutor>(mut db: E, #fn_params) -> Result<#row_name, sqlx::Error> {
                 #sql_setup
-                let mut query = sqlx::query_as::<_, #row_name>(&sql);
+                let mut query = sqlx::query_as::<_, #row_name>(sqlx::AssertSqlSafe(sql));
                 #bind_setup
                 query.fetch_one(db.as_executor()).await
             }
@@ -558,7 +558,7 @@ pub fn gen_many(
         quote! {
             pub async fn #fn_name<E: AsExecutor>(mut db: E, #fn_params) -> Result<Vec<#row_name>, sqlx::Error> {
                 #sql_setup
-                let mut query = sqlx::query_as::<_, #row_name>(&sql);
+                let mut query = sqlx::query_as::<_, #row_name>(sqlx::AssertSqlSafe(sql));
                 #bind_setup
                 query.fetch_all(db.as_executor()).await
             }
@@ -602,7 +602,7 @@ pub fn gen_execrows(
         quote! {
             pub async fn #fn_name<E: AsExecutor>(mut db: E, #fn_params) -> Result<u64, sqlx::Error> {
                 #sql_setup
-                let mut query = sqlx::query(&sql);
+                let mut query = sqlx::query(sqlx::AssertSqlSafe(sql));
                 #bind_setup
                 let result = query.execute(db.as_executor()).await?;
                 Ok(result.rows_affected())
@@ -642,7 +642,7 @@ pub fn gen_execresult(
         quote! {
             pub async fn #fn_name<E: AsExecutor>(mut db: E, #fn_params) -> Result<sqlx::postgres::PgQueryResult, sqlx::Error> {
                 #sql_setup
-                let mut query = sqlx::query(&sql);
+                let mut query = sqlx::query(sqlx::AssertSqlSafe(sql));
                 #bind_setup
                 query.execute(db.as_executor()).await
             }
@@ -684,7 +684,7 @@ pub fn gen_exec(
         quote! {
             pub async fn #fn_name<E: AsExecutor>(mut db: E, #fn_params) -> Result<(), sqlx::Error> {
                 #sql_setup
-                let mut query = sqlx::query(&sql);
+                let mut query = sqlx::query(sqlx::AssertSqlSafe(sql));
                 #bind_setup
                 query.execute(db.as_executor()).await?;
                 Ok(())
@@ -744,7 +744,7 @@ pub fn gen_execlastid(
         quote! {
             pub async fn #fn_name<E: AsExecutor>(mut db: E, #fn_params) -> Result<#ret_ty, sqlx::Error> {
                 #sql_setup
-                let mut query = sqlx::query_as(&sql);
+                let mut query = sqlx::query_as(sqlx::AssertSqlSafe(sql));
                 #bind_setup
                 let (_row,): (#ret_ty,) = query.fetch_one(db.as_executor()).await?;
                 Ok(_row)

@@ -2,6 +2,10 @@
 
 A [sqlc](https://sqlc.dev) plugin that generates type-safe [sqlx](https://github.com/transact-rs/sqlx) Rust code from SQL queries.
 
+Generated code targets **sqlx 0.9 or newer**. Queries that rewrite their SQL at
+run time — `sqlc.slice()` parameters that cannot use `= ANY($1)` — pass the
+result through `sqlx::AssertSqlSafe`, which 0.8 does not have.
+
 ## Prebuilt installation
 
 Release archives contain the executable and install without a Rust compiler.
