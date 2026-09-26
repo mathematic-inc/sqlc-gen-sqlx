@@ -89,7 +89,10 @@ where
                     sql = sql.replace("$1", &replacement);
                 }
             }
-            let mut query = sqlx::query_as::<_, BatchListAuthorsByDynamicIdsRow>(&sql);
+            let mut query = sqlx::query_as::<
+                _,
+                BatchListAuthorsByDynamicIdsRow,
+            >(sqlx::AssertSqlSafe(sql));
             for value in ids {
                 query = query.bind(value);
             }

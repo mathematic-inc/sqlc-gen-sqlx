@@ -113,7 +113,7 @@ pub fn gen_batchexec(
         quote! {
             #item_alias
             #sql_setup
-            let mut query = sqlx::query(&sql);
+            let mut query = sqlx::query(sqlx::AssertSqlSafe(sql));
             #bind_setup
             query.execute(db.as_executor()).await?;
             Ok(Some(((), (db, items))))
@@ -173,7 +173,7 @@ pub fn gen_batchone(
         quote! {
             #item_alias
             #sql_setup
-            let mut query = sqlx::query_as::<_, #row_name>(&sql);
+            let mut query = sqlx::query_as::<_, #row_name>(sqlx::AssertSqlSafe(sql));
             #bind_setup
             let row = query.fetch_one(db.as_executor()).await?;
             Ok(Some((row, (db, items))))
@@ -233,7 +233,7 @@ pub fn gen_batchmany(
         quote! {
             #item_alias
             #sql_setup
-            let mut query = sqlx::query_as::<_, #row_name>(&sql);
+            let mut query = sqlx::query_as::<_, #row_name>(sqlx::AssertSqlSafe(sql));
             #bind_setup
             let rows = query.fetch_all(db.as_executor()).await?;
             Ok(Some((rows, (db, items))))

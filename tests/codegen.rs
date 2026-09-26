@@ -940,6 +940,16 @@ fn snapshot_dynamic_slice_param() {
         code.contains("for value in ids"),
         "expected per-element slice binding in:\n{code}"
     );
+    // sqlx 0.9 only accepts `&'static str` directly; a SQL string built at run
+    // time has to go through `AssertSqlSafe`.
+    assert!(
+        code.contains("sqlx::AssertSqlSafe(sql)"),
+        "expected the rewritten SQL to be wrapped in AssertSqlSafe in:\n{code}"
+    );
+    assert!(
+        !code.contains("(&sql)"),
+        "a borrowed String is not accepted by sqlx 0.9 in:\n{code}"
+    );
 }
 
 #[test]
