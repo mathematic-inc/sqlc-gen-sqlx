@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.7](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.2.6...v0.2.7) (2026-09-26)
+
+
+### Bug Fixes
+
+* **codegen:** Make dynamic-slice queries compile on sqlx 0.9 ([#50](https://github.com/mathematic-inc/sqlc-gen-sqlx/issues/50)) ([2b69750](https://github.com/mathematic-inc/sqlc-gen-sqlx/commit/2b6975015d5d5e5bfd8393b06b783f2f58344112))
+* **deps:** Update rustls security fix ([b31da6c](https://github.com/mathematic-inc/sqlc-gen-sqlx/commit/b31da6cab954ac9527885d410204dbcfc5b8ecd7))
+
 ## [0.2.6](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.2.5...v0.2.6) (2026-09-07)
 
 
