@@ -34,10 +34,10 @@ zizmor = "1.29.0"
 "aqua:owenlamont/ryl" = "0.21.0"
 "aqua:sqlc" = "1.31.1"
 # Compile generators from source so codegen and runtime stay in lockstep.
-"cargo:protoc-gen-buffa" = { version = "0.9.1", default-features = false, depends = [
+"cargo:protoc-gen-buffa" = { version = "0.9.2", default-features = false, depends = [
   "rust",
 ] }
-"cargo:protoc-gen-buffa-packaging" = { version = "0.9.1", default-features = false, depends = [
+"cargo:protoc-gen-buffa-packaging" = { version = "0.9.2", default-features = false, depends = [
   "rust",
   "cargo:protoc-gen-buffa",
 ] }
