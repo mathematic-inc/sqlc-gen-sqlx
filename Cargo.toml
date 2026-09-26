@@ -42,7 +42,7 @@ name = "sqlc-gen-sqlx"
 path = "src/main.rs"
 
 [dependencies]
-buffa = "0.9"
+buffa = "0.9.2"
 convert_case = "0.11"
 prettyplease = "0.3"
 proc-macro2 = "1"
