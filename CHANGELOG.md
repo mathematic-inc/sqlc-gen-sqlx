@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.8](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.2.7...v0.2.8) (2026-11-07)
+
+
+### Bug Fixes
+
+* **deps:** Update dependencies and replace deprecated tooling ([#67](https://github.com/mathematic-inc/sqlc-gen-sqlx/issues/67)) ([93bdfee](https://github.com/mathematic-inc/sqlc-gen-sqlx/commit/93bdfeeb32c39613103b89f8d3eec87af5d1e4c7))
+
 ## [0.2.7](https://github.com/mathematic-inc/sqlc-gen-sqlx/compare/v0.2.6...v0.2.7) (2026-09-26)
 
 
