@@ -29,9 +29,9 @@ resolver = "2"
 members = [".", "examples/*"]
 
 [workspace.dependencies]
-serde_json = "1"
-sqlx = { version = "0.9", features = ["bigdecimal", "bit-vec", "chrono", "ipnetwork", "mac_address", "postgres", "runtime-tokio", "uuid"] }
-tokio = { version = "1", features = ["full"] }
+serde_json = "1.0.154"
+sqlx = { version = "0.9.0", features = ["bigdecimal", "bit-vec", "chrono", "ipnetwork", "mac_address", "postgres", "runtime-tokio", "uuid"] }
+tokio = { version = "1.54.1", features = ["full"] }
 
 [lib]
 name = "sqlc_gen_sqlx"
@@ -43,18 +43,17 @@ path = "src/main.rs"
 
 [dependencies]
 buffa = "0.9.2"
-convert_case = "0.12"
-prettyplease = "0.3"
-proc-macro2 = "1"
-quote = "1"
-serde = { version = "1", features = ["derive"] }
+convert_case = "0.12.0"
+prettyplease = "0.3.0"
+proc-macro2 = "1.0.107"
+quote = "1.0.47"
+serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { workspace = true }
-syn = { version = "3", features = ["full", "visit-mut"] }
+syn = { version = "3.0.9", features = ["full", "visit-mut"] }
 
 [dev-dependencies]
-insta = { version = "1", features = ["filters"] }
-tempfile = "3"
-testcontainers-modules = { version = "0.15", features = ["postgres"] }
+insta = { version = "1.49.0", features = ["filters"] }
+tempfile = "3.27.0"
 tokio = { workspace = true }
 
 [profile.release]

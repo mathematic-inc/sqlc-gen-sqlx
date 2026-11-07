@@ -3,14 +3,24 @@ use std::{
     fs,
     path::{Path, PathBuf},
     process::{Command, Output},
+    time::{Duration, Instant},
 };
 
 use serde_json::json;
 use tempfile::TempDir;
-use testcontainers_modules::{
-    postgres::Postgres,
-    testcontainers::{ContainerAsync, runners::AsyncRunner},
-};
+
+#[derive(Debug)]
+pub struct Postgres {
+    id: String,
+}
+
+impl Drop for Postgres {
+    fn drop(&mut self) {
+        let _ = Command::new("docker")
+            .args(["rm", "--force", "--volumes", &self.id])
+            .output();
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Case {
@@ -21,21 +31,64 @@ pub struct Case {
     pub expected_stderr: Option<String>,
 }
 
-pub async fn start_postgres() -> Result<ContainerAsync<Postgres>, Box<dyn Error>> {
-    Ok(Postgres::default()
-        .with_db_name("sqlc_test")
-        .with_user("sqlc")
-        .with_password("sqlc")
-        .start()
-        .await?)
+pub async fn start_postgres() -> Result<Postgres, Box<dyn Error>> {
+    let id = docker(&[
+        "run",
+        "--detach",
+        "--rm",
+        "--publish",
+        "127.0.0.1::5432",
+        "--env",
+        "POSTGRES_DB=sqlc_test",
+        "--env",
+        "POSTGRES_USER=sqlc",
+        "--env",
+        "POSTGRES_PASSWORD=sqlc",
+        "--health-cmd",
+        "pg_isready -h 127.0.0.1 -U sqlc -d sqlc_test",
+        "--health-interval",
+        "200ms",
+        "--health-timeout",
+        "5s",
+        "--health-retries",
+        "300",
+        "postgres:18.6-alpine",
+    ])?;
+    let postgres = Postgres { id };
+    let deadline = Instant::now() + Duration::from_secs(60);
+    loop {
+        let health = docker(&[
+            "inspect",
+            "--format",
+            "{{.State.Health.Status}}",
+            &postgres.id,
+        ])?;
+        if health == "healthy" {
+            return Ok(postgres);
+        }
+        if health == "unhealthy" || Instant::now() >= deadline {
+            return Err("PostgreSQL did not become healthy within 60 seconds".into());
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
 }
 
-pub async fn database_url(postgres: &ContainerAsync<Postgres>) -> Result<String, Box<dyn Error>> {
-    Ok(format!(
-        "postgres://sqlc:sqlc@{}:{}/sqlc_test",
-        postgres.get_host().await?,
-        postgres.get_host_port_ipv4(5432).await?
-    ))
+pub fn database_url(postgres: &Postgres) -> Result<String, Box<dyn Error>> {
+    let binding = docker(&["port", &postgres.id, "5432/tcp"])?;
+    let port: u16 = binding
+        .rsplit(':')
+        .next()
+        .ok_or("PostgreSQL port is missing")?
+        .parse()?;
+    Ok(format!("postgres://sqlc:sqlc@127.0.0.1:{port}/sqlc_test"))
+}
+
+fn docker(args: &[&str]) -> Result<String, Box<dyn Error>> {
+    let output = command_output(Command::new("docker").args(args))?;
+    if !output.status.success() {
+        return Err(format!("Docker failed: {}", String::from_utf8_lossy(&output.stderr)).into());
+    }
+    Ok(String::from_utf8(output.stdout)?.trim().to_owned())
 }
 
 pub fn load_cases() -> Result<Vec<Case>, Box<dyn Error>> {
