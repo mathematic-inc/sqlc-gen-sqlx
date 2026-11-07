@@ -5,7 +5,7 @@ mod support;
 async fn generated_code_compiles_and_runs_against_postgres()
 -> Result<(), Box<dyn std::error::Error>> {
     let postgres = support::start_postgres().await?;
-    let database_url = support::database_url(&postgres).await?;
+    let database_url = support::database_url(&postgres)?;
 
     for case in support::load_cases()? {
         let tempdir = tempfile::TempDir::new()?;
