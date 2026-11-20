@@ -5,21 +5,17 @@ on:
     tags:
       - v*
   workflow_dispatch:
-    inputs:
-      tag:
-        description: Existing release tag to publish
-        required: true
-        type: string
 
 concurrency:
-  group: release-${{ github.workflow }}-${{ inputs.tag || github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
-  verify:
+  verify-release:
+    name: Verify release
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -40,17 +36,17 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          ref: ${{ inputs.tag || github.ref }}
 
       - name: Install sqlc
         uses: sqlc-dev/setup-sqlc@bac53b7fb28c039a6c7f5736fd1e89744021bdd6 # v5.0.0
         with:
           sqlc-version: "1.31.1"
 
-      - name: Install Rust stable
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           targets: wasm32-wasip1
@@ -61,16 +57,16 @@ jobs:
           install_args: toolconfig
           cache: false
 
-      - name: Check and generate the ToolConfig files
+      - name: Check and generate ToolConfig files
         uses: mathematic-inc/toolconfig-action@1baf7b021e8bf6f0e20737753c13af0fc93c8570 # v2026.11.0
 
-      - name: Format check
+      - name: Check formatting
         run: cargo fmt --all --check
 
-      - name: Clippy
+      - name: Run Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 
-      - name: Snapshot tests
+      - name: Run snapshot tests
         run: cargo test --workspace
         env:
           INSTA_UPDATE: unseen
@@ -78,22 +74,22 @@ jobs:
       - name: Build release WASM plugin
         run: cargo build --release --target wasm32-wasip1
 
-      - name: Integration tests
+      - name: Run integration tests
         run: cargo test -p basic
         env:
           DATABASE_URL: postgres://sqlc:sqlc@localhost:5432/sqlc_test
 
   prebuilt:
+    name: Build prebuilt binaries
+    needs: verify-release
     permissions:
       contents: read
-    needs: verify
     uses: $/.github/workflows/prebuilt.yml
-    with:
-      ref: ${{ inputs.tag || github.sha }}
 
   publish-release:
+    name: Publish GitHub release
     environment: release
-    needs: [verify, prebuilt]
+    needs: [verify-release, prebuilt]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -101,14 +97,14 @@ jobs:
       id-token: write
       attestations: write
     env:
-      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      RELEASE_TAG: ${{ github.ref_name }}
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
-          ref: ${{ inputs.tag || github.ref }}
 
       - name: Download native archives
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -117,7 +113,7 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Install Rust stable
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           targets: wasm32-wasip1
@@ -179,13 +175,12 @@ jobs:
       id-token: write
 
     steps:
-      - name: Checkout
+      - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          ref: ${{ inputs.tag || github.ref }}
 
-      - name: Install Rust toolchain
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           toolchain: stable
@@ -200,11 +195,10 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-io-auth.outputs.token }}
 
   verify-install:
+    name: Verify published installations
+    needs: publish-crate
     permissions:
       contents: read
-    name: Verify published installations
-    needs: [publish-crate]
     uses: $/.github/workflows/prebuilt.yml
     with:
       verify-install: true
-      ref: ${{ inputs.tag || github.sha }}
