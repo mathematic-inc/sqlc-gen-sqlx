@@ -5,14 +5,9 @@ on:
     tags:
       - v*
   workflow_dispatch:
-    inputs:
-      tag:
-        description: Existing release tag to publish
-        required: true
-        type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ inputs.tag || github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
 permissions: {}
@@ -20,6 +15,7 @@ permissions: {}
 jobs:
   verify-release:
     name: Verify release
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -44,7 +40,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          ref: ${{ inputs.tag || github.ref }}
 
       - name: Install sqlc
         uses: sqlc-dev/setup-sqlc@bac53b7fb28c039a6c7f5736fd1e89744021bdd6 # v5.0.0
@@ -90,8 +85,6 @@ jobs:
     permissions:
       contents: read
     uses: $/.github/workflows/prebuilt.yml
-    with:
-      ref: ${{ inputs.tag || github.sha }}
 
   publish-release:
     name: Publish GitHub release
@@ -104,7 +97,7 @@ jobs:
       id-token: write
       attestations: write
     env:
-      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      RELEASE_TAG: ${{ github.ref_name }}
 
     steps:
       - name: Check out repository
@@ -112,7 +105,6 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-          ref: ${{ inputs.tag || github.ref }}
 
       - name: Download native archives
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -187,7 +179,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          ref: ${{ inputs.tag || github.ref }}
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
@@ -211,4 +202,3 @@ jobs:
     uses: $/.github/workflows/prebuilt.yml
     with:
       verify-install: true
-      ref: ${{ inputs.tag || github.sha }}
