@@ -1,7 +1,0 @@
-version: v2
-modules:
-  - path: proto
-lint:
-  ignore_only:
-    PACKAGE_VERSION_SUFFIX:
-      - proto/plugin/codegen.proto
