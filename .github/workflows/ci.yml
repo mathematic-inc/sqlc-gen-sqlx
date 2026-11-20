@@ -7,21 +7,40 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
-  msrv:
-    name: Rust 1.94.0
+  check:
+    name: Check
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install tools
+        uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
+      - name: Check and generate ToolConfig files
+        uses: mathematic-inc/toolconfig-action@1baf7b021e8bf6f0e20737753c13af0fc93c8570 # v2026.11.0
+      - name: Run checks
+        run: hk check --all --slow --skip-step toolconfig
+
+  check-msrv:
+    name: Check MSRV
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -37,6 +56,7 @@ jobs:
         run: rustup run 1.94.0 cargo test --locked -p sqlc-gen-sqlx --all-features --lib --test codegen
 
   test:
+    name: Test
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -57,7 +77,8 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -66,12 +87,12 @@ jobs:
         with:
           sqlc-version: "1.31.1"
 
-      - name: Install Rust stable
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           targets: wasm32-wasip1
 
-      - name: Snapshot tests
+      - name: Run snapshot tests
         run: cargo test --workspace
         env:
           INSTA_UPDATE: unseen
@@ -79,7 +100,7 @@ jobs:
       - name: Build WASM plugin
         run: cargo build --target wasm32-wasip1
 
-      - name: Integration tests
+      - name: Run integration tests
         run: cargo test -p basic
         env:
           DATABASE_URL: postgres://sqlc:sqlc@localhost:5432/sqlc_test
@@ -87,13 +108,15 @@ jobs:
       - name: Verify package
         run: cargo package --locked
 
-  proto-check:
+  check-protos:
+    name: Check protos
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -102,7 +125,7 @@ jobs:
         with:
           install_args: toolconfig
 
-      - name: Check and generate the ToolConfig files
+      - name: Check and generate ToolConfig files
         uses: mathematic-inc/toolconfig-action@1baf7b021e8bf6f0e20737753c13af0fc93c8570 # v2026.11.0
 
       - name: Install buf
@@ -120,7 +143,30 @@ jobs:
           git diff --exit-code -- src
 
   prebuilt:
+    name: Verify prebuilt distribution
     permissions:
       contents: read
-    name: Verify prebuilt distribution
     uses: $/.github/workflows/prebuilt.yml
+
+  required:
+    name: required
+    if: always()
+    needs:
+      - check
+      - check-msrv
+      - test
+      - check-protos
+      - prebuilt
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Check that every other job passed
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$NEEDS"
+          if ! jq -e 'all(.[]; .result == "success" or .result == "skipped")' <<< "$NEEDS" > /dev/null; then
+            echo "::error::A job failed or was cancelled."
+            exit 1
+          fi
