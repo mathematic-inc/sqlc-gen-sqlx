@@ -1,2 +1,5 @@
+[MD013]
+line-length = 80
+
 [global]
-disable = ["MD013", "MD057"]
+exclude = ["**/dist/**", "**/gen/**", "**/generated/**", "**/node_modules/**", "**/target/**", "**/vendor/**", "**/CHANGELOG.md"]
