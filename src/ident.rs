@@ -52,11 +52,6 @@ pub fn type_ident(name: &str) -> proc_macro2::Ident {
 }
 
 /// For enum variants: `PascalCase` with keyword escaping.
-///
-/// Converts `val` to `PascalCase`, then checks whether the result would
-/// collide with a Rust keyword by checking both the `PascalCase` form and
-/// its `snake_case` equivalent against the keyword list.
-/// Example: "type" → `PascalCase` "Type" → snake "type" → keyword → emits `r#Type`.
 #[must_use]
 pub fn variant_ident(name: &str) -> proc_macro2::Ident {
     let pascal = to_pascal_case(name);

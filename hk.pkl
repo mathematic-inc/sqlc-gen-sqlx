@@ -1,10 +1,9 @@
 amends ".hk/org.pkl"
 
 steps {
-  // The step of the organization sets no `workspace_indicator`, so hk cannot render the `dir` of
-  // the builtin step.
+  // The organization step sets no `workspace_indicator`, so hk cannot render the builtin `dir`.
   ["cargo-deny"] { dir = "{{root}}" }
-  // The test database has the user and the password `sqlc`. kingfisher reports its URI.
+  // kingfisher reports the URI of the test database (user and password `sqlc`).
   ["kingfisher"] {
     check =
       "kingfisher scan {{ files }} --no-update-check --no-validate --quiet --redact --skip-regex 'postgres://sqlc:sqlc@'"

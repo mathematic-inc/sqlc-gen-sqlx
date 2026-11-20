@@ -15,7 +15,7 @@ pub struct ResolvedType {
     /// codegen runs a lifetime-injection pass when emitting into positions
     /// that require a named lifetime (struct field, where clause).
     pub borrowed_rust_type: Option<String>,
-    /// Whether the value is cheap to copy. A nullable or array type is never cheap to copy.
+    /// Whether the value is cheap to copy. Never true for a nullable or array type.
     pub copy_cheap: bool,
 }
 
@@ -31,8 +31,7 @@ struct OverrideEntry {
     copy_cheap: bool,
 }
 
-/// Built-in PostgreSQL type names. Each row gives the names of one type, its Rust type, and
-/// whether the Rust type is cheap to copy.
+/// Each row: the names of one PostgreSQL type, its Rust type, and whether it is cheap to copy.
 const DEFAULT_TYPES: &[(&[&str], &str, bool)] = &[
     (&["bool", "boolean", "pg_catalog.bool"], "bool", true),
     (
@@ -190,7 +189,7 @@ pub struct TypeMap {
 }
 
 impl TypeMap {
-    /// Make the map of the built-in types, with the user overrides and cheap-to-copy types applied.
+    /// Make the map of the built-in types.
     #[must_use]
     pub fn new(overrides: &[TypeOverride], copy_cheap_types: &[String]) -> Self {
         let defaults: HashMap<&'static str, (&'static str, bool)> = DEFAULT_TYPES
@@ -248,8 +247,6 @@ impl TypeMap {
     }
 
     /// Resolve a PostgreSQL type, with at most one array dimension.
-    ///
-    /// Returns `None` when the type is not known.
     #[must_use]
     pub fn resolve_pg_type(
         &self,
@@ -261,8 +258,6 @@ impl TypeMap {
     }
 
     /// Resolve a PostgreSQL type with a number of array dimensions.
-    ///
-    /// Returns `None` when the type is not known.
     #[must_use]
     pub fn resolve_pg_type_dims(
         &self,
@@ -309,8 +304,6 @@ impl TypeMap {
 
     /// Resolve the type of a column, with at most one array dimension. A column override wins over
     /// the type.
-    ///
-    /// Returns `None` when the type is not known.
     #[must_use]
     pub fn resolve_column(
         &self,
@@ -331,8 +324,6 @@ impl TypeMap {
 
     /// Resolve the type of a column with a number of array dimensions. A column override wins over
     /// the type.
-    ///
-    /// Returns `None` when the type is not known.
     #[must_use]
     pub fn resolve_column_dims(
         &self,
@@ -393,8 +384,7 @@ impl ColumnOverride {
     }
 }
 
-/// Number of array dimensions of a column. `declared` is the count that sqlc gives. It is 0 when
-/// sqlc only sets `is_array`.
+/// `declared` is 0 when sqlc only sets `is_array`.
 pub(crate) fn array_dimensions(declared: i32, is_array: bool) -> usize {
     usize::try_from(declared)
         .ok()
