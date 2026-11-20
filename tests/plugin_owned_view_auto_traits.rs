@@ -1,4 +1,4 @@
-#![warn(rust_2018_idioms)]
+//! Test that the owned views of the plugin protocol are `Send`, `Sync` and `Unpin`.
 
 use sqlc_gen_sqlx::plugin::{
     CatalogOwnedView, CodegenOwnedView, ColumnOwnedView, CompositeTypeOwnedView, EnumOwnedView,

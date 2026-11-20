@@ -59,7 +59,7 @@ fn batch_stream_method(
     fn_name: &proc_macro2::Ident,
     items_ty: &TokenStream,
     result_ty: &TokenStream,
-    next_body: TokenStream,
+    next_body: &TokenStream,
 ) -> TokenStream {
     quote! {
         pub fn #fn_name<'a, E, I>(
@@ -86,7 +86,7 @@ fn batch_stream_method(
 }
 
 /// `:batchexec` → `fn foo(items) -> impl Stream<Item = Result<(), Error>>`
-pub fn gen_batchexec(
+pub(super) fn gen_batchexec(
     query: &QueryView<'_>,
     type_map: &TypeMap,
     config: &Config,
@@ -138,12 +138,12 @@ pub fn gen_batchexec(
         }
     };
 
-    let method = batch_stream_method(&fn_name, &items_ty, &quote! { () }, next_body);
+    let method = batch_stream_method(&fn_name, &items_ty, &quote! { () }, &next_body);
     Ok(quote! { #params_struct #const_tokens #method })
 }
 
 /// `:batchone` → `fn foo(items) -> impl Stream<Item = Result<Row, Error>>`
-pub fn gen_batchone(
+pub(super) fn gen_batchone(
     query: &QueryView<'_>,
     type_map: &TypeMap,
     config: &Config,
@@ -198,12 +198,12 @@ pub fn gen_batchone(
         }
     };
 
-    let method = batch_stream_method(&fn_name, &items_ty, &quote! { #row_name }, next_body);
+    let method = batch_stream_method(&fn_name, &items_ty, &quote! { #row_name }, &next_body);
     Ok(quote! { #params_struct #const_tokens #row_tokens #method })
 }
 
 /// `:batchmany` → `fn foo(items) -> impl Stream<Item = Result<Vec<Row>, Error>>`
-pub fn gen_batchmany(
+pub(super) fn gen_batchmany(
     query: &QueryView<'_>,
     type_map: &TypeMap,
     config: &Config,
@@ -258,6 +258,6 @@ pub fn gen_batchmany(
         }
     };
 
-    let method = batch_stream_method(&fn_name, &items_ty, &quote! { Vec<#row_name> }, next_body);
+    let method = batch_stream_method(&fn_name, &items_ty, &quote! { Vec<#row_name> }, &next_body);
     Ok(quote! { #params_struct #const_tokens #row_tokens #method })
 }

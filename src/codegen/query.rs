@@ -8,7 +8,7 @@ use crate::{
     error::Error,
     ident::{field_ident, query_params_name, to_pascal_case, to_snake_case, type_ident},
     plugin::{ColumnView, ParameterView, QueryView},
-    types::{ColumnOverride, ResolvedType, TypeMap},
+    types::{ColumnOverride, ResolvedType, TypeMap, array_dimensions},
 };
 
 /// Resolved parameter: Rust identifier + type.
@@ -30,16 +30,16 @@ impl Param {
             .unwrap_or(&self.resolved.rust_type)
     }
 
-    pub(crate) fn is_borrowed(&self) -> bool {
+    pub(crate) const fn is_borrowed(&self) -> bool {
         self.resolved.borrowed_rust_type.is_some()
     }
 }
 
 /// Columns from an embedded table (`sqlc.embed(table)`), grouped together.
 pub(crate) struct EmbeddedGroup {
-    /// snake_case field name in the parent struct, e.g. `author`
+    /// `snake_case` field name in the parent struct, e.g. `author`
     pub(crate) embed_field_ident: proc_macro2::Ident,
-    /// PascalCase struct name for the sub-struct, e.g. `AuthorEmbed`
+    /// `PascalCase` struct name for the sub-struct, e.g. `AuthorEmbed`
     pub(crate) struct_ident: proc_macro2::Ident,
     /// Fields of the sub-struct in declaration order
     pub(crate) fields: Vec<(proc_macro2::Ident, ResolvedType)>,
@@ -64,14 +64,12 @@ pub(crate) fn resolve_params<'a>(
             .column
             .as_option()
             .ok_or_else(|| Error::Codegen("parameter missing column".into()))?;
-        let pg_type = col.r#type.as_option().map(|t| t.name).unwrap_or("");
+        let pg_type = col.r#type.as_option().map_or("", |t| t.name);
         let nullable = !col.not_null;
         let array_dims = if col.is_sqlc_slice {
             1usize
-        } else if col.array_dims > 0 {
-            col.array_dims as usize
         } else {
-            usize::from(col.is_array)
+            array_dimensions(col.array_dims, col.is_array)
         };
         let col_key = col
             .table
@@ -157,12 +155,7 @@ pub(crate) fn bind_calls(params: &[Param], use_arg: Option<&proc_macro2::Ident>)
     params
         .iter()
         .map(|p| {
-            let ident = &p.ident;
-            let value = if let Some(arg) = use_arg {
-                quote! { #arg.#ident }
-            } else {
-                quote! { #ident }
-            };
+            let value = param_value_expr(p, use_arg);
             quote! { .bind(#value) }
         })
         .collect()
@@ -170,11 +163,7 @@ pub(crate) fn bind_calls(params: &[Param], use_arg: Option<&proc_macro2::Ident>)
 
 fn param_value_expr(param: &Param, use_arg: Option<&proc_macro2::Ident>) -> TokenStream {
     let ident = &param.ident;
-    if let Some(arg) = use_arg {
-        quote! { #arg.#ident }
-    } else {
-        quote! { #ident }
-    }
+    use_arg.map_or_else(|| quote! { #ident }, |arg| quote! { #arg.#ident })
 }
 
 fn ordered_params(params: &[Param]) -> Vec<&Param> {
@@ -239,7 +228,7 @@ pub(crate) fn dynamic_sql_setup(
     let last_idx = ordered.len().saturating_sub(1);
     for (idx, param) in ordered.iter().enumerate() {
         let is_last = idx == last_idx;
-        let placeholder_ident = format_ident!("placeholder_{}", param.number as usize);
+        let placeholder_ident = format_ident!("placeholder_{}", param.number.unsigned_abs());
         tokens.push(quote! {
             let #placeholder_ident = next_placeholder;
         });
@@ -337,16 +326,12 @@ pub(crate) fn resolve_columns<'a>(
     let mut embedded_groups: Vec<(String, Vec<(proc_macro2::Ident, ResolvedType)>)> = Vec::new();
 
     for col in cols {
-        let pg_type = col.r#type.as_option().map(|t| t.name).unwrap_or("");
+        let pg_type = col.r#type.as_option().map_or("", |t| t.name);
         if pg_type.is_empty() {
             return Err(Error::Codegen(format!("column '{}' has no type", col.name)));
         }
         let nullable = !col.not_null;
-        let array_dims = if col.array_dims > 0 {
-            col.array_dims as usize
-        } else {
-            usize::from(col.is_array)
-        };
+        let array_dims = array_dimensions(col.array_dims, col.is_array);
         let col_key = col
             .table
             .as_option()
@@ -481,7 +466,7 @@ pub(crate) fn build_fn_params(
 }
 
 /// `:one` → `async fn foo<E: AsExecutor>(mut db: E, [params]) -> Result<FooRow, sqlx::Error>`
-pub fn gen_one(
+pub(super) fn gen_one(
     query: &QueryView<'_>,
     type_map: &TypeMap,
     config: &Config,
@@ -533,7 +518,7 @@ pub fn gen_one(
 }
 
 /// `:many` → `async fn foo<E: AsExecutor>(mut db: E, [params]) -> Result<Vec<FooRow>, sqlx::Error>`
-pub fn gen_many(
+pub(super) fn gen_many(
     query: &QueryView<'_>,
     type_map: &TypeMap,
     config: &Config,
@@ -583,7 +568,7 @@ pub fn gen_many(
 }
 
 /// `:execrows` → `async fn foo<E: AsExecutor>(mut db: E, [params]) -> Result<u64, sqlx::Error>`
-pub fn gen_execrows(
+pub(super) fn gen_execrows(
     query: &QueryView<'_>,
     type_map: &TypeMap,
     config: &Config,
@@ -623,7 +608,7 @@ pub fn gen_execrows(
 }
 
 /// `:execresult` → `async fn foo<E: AsExecutor>(mut db: E, [params]) -> Result<sqlx::postgres::PgQueryResult, sqlx::Error>`
-pub fn gen_execresult(
+pub(super) fn gen_execresult(
     query: &QueryView<'_>,
     type_map: &TypeMap,
     config: &Config,
@@ -661,7 +646,7 @@ pub fn gen_execresult(
 }
 
 /// `:exec` → `async fn foo<E: AsExecutor>(mut db: E, [params]) -> Result<(), sqlx::Error>`
-pub fn gen_exec(
+pub(super) fn gen_exec(
     query: &QueryView<'_>,
     type_map: &TypeMap,
     config: &Config,
@@ -711,7 +696,7 @@ pub fn gen_exec(
 
 /// `:execlastid` → `async fn foo<E: AsExecutor>(mut db: E, [params]) -> Result<T, sqlx::Error>`
 /// where T is the type of the single RETURNING column.
-pub fn gen_execlastid(
+pub(super) fn gen_execlastid(
     query: &QueryView<'_>,
     type_map: &TypeMap,
     config: &Config,

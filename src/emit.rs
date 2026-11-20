@@ -2,6 +2,7 @@ use crate::error::Error;
 
 /// Collects `TokenStream` fragments and formats them into a Rust source file
 /// using `prettyplease`.
+#[derive(Debug)]
 pub struct FileEmitter {
     sqlc_version: String,
     plugin_version: String,
@@ -9,6 +10,8 @@ pub struct FileEmitter {
 }
 
 impl FileEmitter {
+    /// Start an empty file. The versions go into the header.
+    #[must_use]
     pub fn new(sqlc_version: &str, plugin_version: &str) -> Self {
         Self {
             sqlc_version: sqlc_version.to_string(),
@@ -23,6 +26,10 @@ impl FileEmitter {
     }
 
     /// Render all items into a formatted Rust source string.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the items are not valid Rust.
     pub fn finish(self) -> Result<String, Error> {
         use quote::quote;
 

@@ -1,13 +1,20 @@
 use crate::error::Error;
 
+/// Plugin options, from `options` in `sqlc.yaml`.
 #[derive(Debug, serde::Deserialize)]
 #[serde(default)]
 pub struct Config {
+    /// Name of the output file.
     pub output: String,
+    /// Type overrides, for PostgreSQL types and for columns.
     pub overrides: Vec<TypeOverride>,
+    /// Extra derives for row and params structs.
     pub row_derives: Vec<String>,
+    /// Extra derives for generated enum types.
     pub enum_derives: Vec<String>,
+    /// Extra derives for generated composite types.
     pub composite_derives: Vec<String>,
+    /// Type names to mark as cheap to copy.
     pub copy_cheap_types: Vec<String>,
 }
 
@@ -25,8 +32,14 @@ impl Default for Config {
 }
 
 impl Config {
+    /// Parse the plugin options from JSON.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the JSON is not valid, or when an override sets no Rust type or an
+    /// invalid `borrowed_rs_type`.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
-        let cfg: Config = serde_json::from_slice(bytes)?;
+        let cfg: Self = serde_json::from_slice(bytes)?;
         for o in &cfg.overrides {
             let target = || {
                 o.db_type
@@ -68,9 +81,12 @@ fn validate_borrowed_type(rs_type: &str, target: &str) -> Result<(), Error> {
     Ok(())
 }
 
+/// An override of the Rust type of a PostgreSQL type or of one column.
 #[derive(Debug, serde::Deserialize)]
 pub struct TypeOverride {
+    /// PostgreSQL type that the override applies to.
     pub db_type: Option<String>,
+    /// Column, as `table.column`, that the override applies to.
     pub column: Option<String>,
     /// Owned Rust type for rows and array contents. Optional when
     /// `borrowed_rs_type` is set; missing values fall back to the built-in
@@ -82,6 +98,7 @@ pub struct TypeOverride {
     /// lifetime), while rows and array contents continue to use the owned
     /// form.
     pub borrowed_rs_type: Option<String>,
+    /// Whether the type is cheap to copy.
     #[serde(default)]
     pub copy_cheap: bool,
 }
@@ -95,7 +112,7 @@ mod tests {
         let c = Config::from_bytes(b"{}").unwrap();
         assert_eq!(c.output, "queries.rs");
         assert!(c.overrides.is_empty());
-        assert!(c.row_derives.is_empty());
+        assert_eq!(c.row_derives, Vec::<String>::new());
     }
 
     #[test]

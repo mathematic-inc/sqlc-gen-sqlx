@@ -8,6 +8,8 @@ const KEYWORDS: &[&str] = &[
     "override", "priv", "try", "typeof", "unsized", "virtual", "yield",
 ];
 
+/// Replace each character that is not alphanumeric or `_` with `_`.
+#[must_use]
 pub fn normalize_ident(s: &str) -> String {
     s.chars()
         .map(|c| {
@@ -20,14 +22,20 @@ pub fn normalize_ident(s: &str) -> String {
         .collect()
 }
 
+/// Convert a name to `snake_case`.
+#[must_use]
 pub fn to_snake_case(s: &str) -> String {
     normalize_ident(s).to_case(Case::Snake)
 }
 
+/// Convert a name to `PascalCase`.
+#[must_use]
 pub fn to_pascal_case(s: &str) -> String {
     normalize_ident(s).to_case(Case::Pascal)
 }
 
+/// Make a field name in `snake_case`, with `r#` for a keyword.
+#[must_use]
 pub fn field_ident(name: &str) -> proc_macro2::Ident {
     let snake = to_snake_case(name);
     if KEYWORDS.contains(&snake.as_str()) {
@@ -37,15 +45,14 @@ pub fn field_ident(name: &str) -> proc_macro2::Ident {
     }
 }
 
+/// Make a type name in `PascalCase`.
+#[must_use]
 pub fn type_ident(name: &str) -> proc_macro2::Ident {
     quote::format_ident!("{}", to_pascal_case(name))
 }
 
-/// For enum variants: PascalCase with keyword escaping.
-/// Converts `val` to PascalCase, then checks whether the result would
-/// collide with a Rust keyword by checking both the PascalCase form and
-/// its snake_case equivalent against the keyword list.
-/// Example: "type" → PascalCase "Type" → snake "type" → keyword → emits `r#Type`.
+/// For enum variants: `PascalCase` with keyword escaping.
+#[must_use]
 pub fn variant_ident(name: &str) -> proc_macro2::Ident {
     let pascal = to_pascal_case(name);
     let snake = to_snake_case(&pascal);
@@ -53,20 +60,24 @@ pub fn variant_ident(name: &str) -> proc_macro2::Ident {
         // Only use raw identifier if the pascal form itself can be raw-escaped.
         // Some keywords like `Self` cannot appear as raw identifiers, so we
         // append an underscore as a fallback.
-        if !["Self", "true", "false"].contains(&pascal.as_str()) {
-            quote::format_ident!("r#{}", pascal)
-        } else {
+        if ["Self", "true", "false"].contains(&pascal.as_str()) {
             quote::format_ident!("{}_", pascal)
+        } else {
+            quote::format_ident!("r#{}", pascal)
         }
     } else {
         quote::format_ident!("{}", pascal)
     }
 }
 
+/// Name of the params struct of a query.
+#[must_use]
 pub fn query_params_name(query_name: &str) -> String {
     format!("{}Params", to_pascal_case(query_name))
 }
 
+/// Name of the row struct of a query.
+#[must_use]
 pub fn query_row_name(query_name: &str) -> String {
     format!("{}Row", to_pascal_case(query_name))
 }

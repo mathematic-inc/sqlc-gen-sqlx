@@ -1,6 +1,7 @@
 # sqlc-gen-sqlx
 
-A [sqlc](https://sqlc.dev) plugin that generates type-safe [sqlx](https://github.com/transact-rs/sqlx) Rust code from SQL queries.
+A [sqlc](https://sqlc.dev) plugin that generates type-safe
+[sqlx](https://github.com/transact-rs/sqlx) Rust code from SQL queries.
 
 Generated code targets **sqlx 0.9 or newer**. Queries that rewrite their SQL at
 run time — `sqlc.slice()` parameters that cannot use `= ANY($1)` — pass the
@@ -22,9 +23,9 @@ Or declare the GitHub release directly in `mise.toml`:
 "github:mathematic-inc/sqlc-gen-sqlx" = "latest"
 ```
 
-Run `mise install` to download and activate the executable. No custom mise plugin
-is required. The Cargo backend (`cargo:sqlc-gen-sqlx`) also supports these releases;
-set `cargo.binstall_only = true` to reject source compilation.
+Run `mise install` to download and activate the executable. No custom mise
+plugin is required. The Cargo backend (`cargo:sqlc-gen-sqlx`) also supports
+these releases; set `cargo.binstall_only = true` to reject source compilation.
 
 | Platform | Architectures | Archive |
 | --- | --- | --- |
@@ -33,10 +34,11 @@ set `cargo.binstall_only = true` to reject source compilation.
 | Linux musl | x64, ARM64 | `.tar.gz` |
 | Windows MSVC | x64, ARM64 | `.zip` |
 
-Every archive includes SHA-256 checksums and GitHub build provenance. CI builds all
-eight targets and runs the extracted executables on the matching architecture.
-After publication, the release workflow installs through cargo-binstall and mise
-and runs both installations. A missing prebuilt binary fails the release checks.
+Every archive includes SHA-256 checksums and GitHub build provenance. CI builds
+all eight targets and runs the extracted executables on the matching
+architecture. After publication, the release workflow installs through
+cargo-binstall and mise and runs both installations. A missing prebuilt binary
+fails the release checks.
 
 The release also includes `sqlc-gen-sqlx.wasm`. Continue using `plugins[].wasm`
 with its URL and checksum for sqlc's WASM plugin mode. The native executable
@@ -48,10 +50,14 @@ For each SQL query annotated with a sqlc command, the plugin emits:
 
 - A `const SQL: &str` holding the query text.
 - A strongly-typed row struct (`QueryNameRow`) for `:one` / `:many`.
-- An optional params struct (`QueryNameParams`) when a query has 2+ parameters.
-- A free `pub async fn` (or `pub fn` for batch streams) that executes the query, taking the executor as its first argument.
+- An optional parameters struct (`QueryNameParams`) when a query has 2+ parameters.
+- A free `pub async fn` (or `pub fn` for batch streams) that executes the query,
+  taking the executor as its first argument.
 
-The executor argument is generic over the `AsExecutor` trait emitted in the same file. `AsExecutor` is implemented for `&PgPool`, `&mut PgConnection`, `&mut Transaction<'_, Postgres>`, `&mut PoolConnection<Postgres>`, and `&mut T` of each — i.e. the natural sqlx reference types:
+The executor argument is generic over the `AsExecutor` trait emitted in the same
+file. `AsExecutor` is implemented for `&PgPool`, `&mut PgConnection`,
+`&mut Transaction<'_, Postgres>`, `&mut PoolConnection<Postgres>`, and `&mut T`
+of each — i.e. the natural sqlx reference types:
 
 ```rust
 // From a pool:
@@ -97,7 +103,7 @@ All options are passed in `codegen[*].options`:
 |---|---|---|---|
 | `output` | string | `queries.rs` | Output filename |
 | `overrides` | array | `[]` | Type overrides (`rs_type`, optional `borrowed_rs_type`; see below) |
-| `row_derives` | array | `[]` | Extra derives for row and params structs |
+| `row_derives` | array | `[]` | Extra derives for row and parameters structs |
 | `enum_derives` | array | `[]` | Extra derives for generated enum types |
 | `composite_derives` | array | `[]` | Extra derives for generated composite types |
 | `copy_cheap_types` | array | `[]` | Type names to mark as copy-cheap |
@@ -218,18 +224,34 @@ Array types (`type[]`) become `Vec<T>`. Nullable columns become `Option<T>`.
 | `:batchmany` | `impl Stream<Item = Result<Vec<QueryRow>, sqlx::Error>>` | Lazily fetch all rows per item |
 | `:copyfrom` | `Result<u64, sqlx::Error>` | Chunked bulk insert from any `IntoIterator` |
 
-All functions are free `pub async fn` (or `pub fn` for batch streams) at module scope, taking the executor as their first argument. The bound is `E: AsExecutor`, where `AsExecutor` is the trait emitted in each generated file. Impls cover `&PgPool`, `&mut PgConnection`, `&mut Transaction<'_, Postgres>`, `&mut PoolConnection<Postgres>`, and `&mut T` of each.
+All functions are free `pub async fn` (or `pub fn` for batch streams) at module
+scope, taking the executor as their first argument. The bound is
+`E: AsExecutor`, where `AsExecutor` is the trait emitted in each generated file.
+Impls cover `&PgPool`, `&mut PgConnection`, `&mut Transaction<'_, Postgres>`,
+`&mut PoolConnection<Postgres>`, and `&mut T` of each.
 
-Batch methods generate `Stream`-returning APIs and reference `futures_core` and `futures_util` directly. Consumer crates should include those dependencies alongside `sqlx`.
+Batch methods generate `Stream`-returning APIs and reference `futures_core` and
+`futures_util` directly. Consumer crates should include those dependencies
+alongside `sqlx`.
 
 ## sqlc extensions
 
-- **`sqlc.slice()`**: Parameters marked as slice expand to `Vec<T>` and support runtime placeholder expansion for `IN (sqlc.slice(...))`-style queries.
-- **`sqlc.embed(table)`**: Result columns from an embedded table become a nested struct with `#[sqlx(flatten)]`.
+- **`sqlc.slice()`**: Parameters marked as slice expand to `Vec<T>` and support
+  runtime placeholder expansion for `IN (sqlc.slice(...))`-style queries.
+- **`sqlc.embed(table)`**: Result columns from an embedded table become a nested
+  struct with `#[sqlx(flatten)]`.
 
 ## Contributing
 
-We review change proposals in Discussions before code. [Start a Discussion](https://github.com/mathematic-inc/sqlc-gen-sqlx/discussions/new) and wait for a maintainer's review. If we accept the proposal, a Mathematic maintainer or agent will implement it and open the pull request. When Mathematic implements a proposal, the implementation PR will link to the Discussion and credit its original author. GitHub limits pull request creation to Mathematic maintainers and repository collaborators with write, maintain, or admin access, plus authorized maintenance agents. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full process.
+We review change proposals in Discussions before code.
+[Start a Discussion](https://github.com/mathematic-inc/sqlc-gen-sqlx/discussions/new)
+and wait for a maintainer's review. If we accept the proposal, a Mathematic
+maintainer or agent will implement it and open the pull request. When Mathematic
+implements a proposal, the implementation PR will link to the Discussion and
+credit its original author. GitHub limits pull request creation to Mathematic
+maintainers and repository collaborators with write, maintain, or admin access,
+plus authorized maintenance agents. See [CONTRIBUTING.md](./CONTRIBUTING.md) for
+the full process.
 
 ## License
 

@@ -1,3 +1,7 @@
+//! Example of the code that sqlc-gen-sqlx generates for batch queries.
+
+// `sqlc generate` writes this module.
+#[allow(missing_docs, unreachable_pub)]
 #[cfg(test)]
 #[path = "queries.rs"]
 mod queries;
@@ -53,4 +57,4 @@ async fn test_batch_roundtrip() {
     assert_eq!(count.0, 0);
 }
 
-fn main() {}
+const fn main() {}

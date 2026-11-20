@@ -22,7 +22,7 @@ use crate::{
 ///     Inactive,
 /// }
 /// ```
-pub fn gen_enum(info: &EnumInfo, extra_derives: &[String]) -> Result<TokenStream, Error> {
+pub(super) fn gen_enum(info: &EnumInfo, extra_derives: &[String]) -> Result<TokenStream, Error> {
     let rust_name = type_ident(&info.rust_name);
     let type_name = &info.type_name;
 

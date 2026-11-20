@@ -1,10 +1,8 @@
-[files]
-yaml = [
-  "*.yaml",
-  "*.yml",
-]
+[lint]
+strict = true
 
 [lint.rules]
+key-duplicates = "enable"
 anchors = "enable"
 braces = "enable"
 brackets = "enable"
@@ -16,15 +14,18 @@ empty-lines = "enable"
 empty-values = "disable"
 float-values = "disable"
 hyphens = "enable"
-indentation = "enable"
-key-duplicates = "enable"
 key-ordering = "disable"
 line-length = "disable"
 new-line-at-end-of-file = "enable"
-new-lines = "enable"
 octal-values = "disable"
 quoted-strings = "disable"
 trailing-spaces = "enable"
+
+[lint.rules.indentation]
+spaces = 2
+
+[lint.rules.new-lines]
+type = "unix"
 
 [lint.rules.comments]
 level = "warning"
@@ -36,6 +37,9 @@ level = "warning"
 [lint.rules.truthy]
 check-keys = false
 level = "warning"
+
+[files]
+yaml = ["*.yaml", "*.yml"]
 
 [format]
 quote-style = "preserve"

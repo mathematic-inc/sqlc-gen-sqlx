@@ -1,6 +1,5 @@
 version: 3
-
 rules:
   - ignore: true
     conditions:
-      - expr: ActionName == "dtolnay/rust-toolchain"
+      - expr: ActionName == "dtolnay/rust-toolchain" && ActionVersion matches "^[0-9a-f]{40}$"

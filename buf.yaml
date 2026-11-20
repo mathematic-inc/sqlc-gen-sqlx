@@ -2,10 +2,6 @@ version: v2
 modules:
   - path: proto
 lint:
-  use:
-    - STANDARD
-  except:
-    - PACKAGE_VERSION_SUFFIX
-breaking:
-  use:
-    - FILE
+  ignore_only:
+    PACKAGE_VERSION_SUFFIX:
+      - proto/plugin/codegen.proto

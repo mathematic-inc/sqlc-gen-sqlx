@@ -1,3 +1,7 @@
+//! Example of the code that sqlc-gen-sqlx generates for advanced PostgreSQL types.
+
+// `sqlc generate` writes this module.
+#[allow(missing_docs, unreachable_pub)]
 #[path = "queries.rs"]
 #[cfg(test)]
 mod queries;
@@ -23,7 +27,7 @@ async fn test_advanced_types_roundtrip() {
         .await
         .unwrap();
 
-    let flags = sqlx::types::BitVec::from_bytes(&[0b10101010]);
+    let flags = sqlx::types::BitVec::from_bytes(&[0b1010_1010]);
     let now = chrono::Utc::now();
     let later = now + chrono::Duration::hours(1);
     let window = sqlx::postgres::types::PgRange::from((
@@ -43,4 +47,4 @@ async fn test_advanced_types_roundtrip() {
     assert_eq!(event.name, "conference");
 }
 
-fn main() {}
+const fn main() {}

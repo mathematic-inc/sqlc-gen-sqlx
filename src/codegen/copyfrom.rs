@@ -13,7 +13,7 @@ use crate::{
 
 use super::query::{Param, any_borrowed, maybe_params_struct, resolve_params, sql_const};
 
-pub fn gen_copyfrom(
+pub(super) fn gen_copyfrom(
     query: &QueryView<'_>,
     type_map: &TypeMap,
     config: &Config,

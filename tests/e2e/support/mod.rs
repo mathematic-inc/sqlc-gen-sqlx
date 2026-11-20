@@ -10,7 +10,7 @@ use serde_json::json;
 use tempfile::TempDir;
 
 #[derive(Debug)]
-pub struct Postgres {
+pub(crate) struct Postgres {
     id: String,
 }
 
@@ -23,7 +23,7 @@ impl Drop for Postgres {
 }
 
 #[derive(Debug, Clone)]
-pub struct Case {
+pub(crate) struct Case {
     pub name: String,
     pub dir: PathBuf,
     pub config_name: String,
@@ -31,7 +31,7 @@ pub struct Case {
     pub expected_stderr: Option<String>,
 }
 
-pub async fn start_postgres() -> Result<Postgres, Box<dyn Error>> {
+pub(crate) async fn start_postgres() -> Result<Postgres, Box<dyn Error>> {
     let id = docker(&[
         "run",
         "--detach",
@@ -73,7 +73,7 @@ pub async fn start_postgres() -> Result<Postgres, Box<dyn Error>> {
     }
 }
 
-pub fn database_url(postgres: &Postgres) -> Result<String, Box<dyn Error>> {
+pub(crate) fn database_url(postgres: &Postgres) -> Result<String, Box<dyn Error>> {
     let binding = docker(&["port", &postgres.id, "5432/tcp"])?;
     let port: u16 = binding
         .rsplit(':')
@@ -91,7 +91,7 @@ fn docker(args: &[&str]) -> Result<String, Box<dyn Error>> {
     Ok(String::from_utf8(output.stdout)?.trim().to_owned())
 }
 
-pub fn load_cases() -> Result<Vec<Case>, Box<dyn Error>> {
+pub(crate) fn load_cases() -> Result<Vec<Case>, Box<dyn Error>> {
     let root = cases_root();
     let mut cases = Vec::new();
     collect_cases(&root, &root, &mut cases)?;
@@ -104,7 +104,7 @@ pub fn load_cases() -> Result<Vec<Case>, Box<dyn Error>> {
     Ok(cases)
 }
 
-pub fn write_generated_crate(dir: &TempDir, case: &Case) -> Result<PathBuf, Box<dyn Error>> {
+pub(crate) fn write_generated_crate(dir: &TempDir, case: &Case) -> Result<PathBuf, Box<dyn Error>> {
     let root = dir.path().to_path_buf();
     write_file(&root.join("Cargo.toml"), &crate_manifest(&case.name))?;
     write_file(&root.join("src/lib.rs"), "")?;
@@ -117,7 +117,7 @@ pub fn write_generated_crate(dir: &TempDir, case: &Case) -> Result<PathBuf, Box<
     Ok(root)
 }
 
-pub fn run_generated_crate(
+pub(crate) fn run_generated_crate(
     crate_root: &Path,
     case: &Case,
     database_url: &str,
@@ -138,11 +138,9 @@ pub fn run_generated_crate(
         let actual = normalize_stderr(&String::from_utf8_lossy(&generate.stderr));
         let expected = normalize_stderr(expected_stderr);
         if actual != expected {
-            return Err(format!(
-                "stderr mismatch\nexpected:\n{}\n\nactual:\n{}",
-                expected, actual
-            )
-            .into());
+            return Err(
+                format!("stderr mismatch\nexpected:\n{expected}\n\nactual:\n{actual}").into(),
+            );
         }
 
         return Ok(());

@@ -1,3 +1,5 @@
+//! End-to-end test: the generated code compiles and runs against PostgreSQL.
+
 #[path = "e2e/support/mod.rs"]
 mod support;
 
