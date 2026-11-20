@@ -1,11 +1,30 @@
+//! A sqlc plugin that generates type-safe sqlx Rust code from SQL queries.
+
+/// Enum and composite types of the sqlc catalog.
 pub mod catalog;
+/// Rust code for the queries and types of a sqlc request.
 pub mod codegen;
+/// Plugin options.
 pub mod config;
+/// Formatted Rust source of the output file.
 pub mod emit;
+/// Errors of the plugin.
 pub mod error;
+/// Rust identifiers made from PostgreSQL names.
 pub mod ident;
+/// Rust types for PostgreSQL types.
 pub mod types;
 
+// `buf generate` writes this module.
+#[allow(
+    clippy::all,
+    clippy::nursery,
+    clippy::pedantic,
+    missing_debug_implementations,
+    missing_docs,
+    rust_2018_idioms,
+    unreachable_pub
+)]
 #[path = "mod.rs"]
 mod generated;
 pub use generated::plugin;
@@ -16,6 +35,10 @@ use buffa::{Message as _, MessageView as _};
 use plugin::{GenerateRequestView, GenerateResponse};
 
 /// WASI binary entry: read stdin → process → write stdout.
+///
+/// # Errors
+///
+/// Returns an error when stdin or stdout fails, or when [`run_with_bytes`] fails.
 pub fn run() -> Result<(), Error> {
     use std::io::{Read, Write};
     let mut buf = Vec::new();
@@ -26,6 +49,11 @@ pub fn run() -> Result<(), Error> {
 }
 
 /// Testable core: bytes in, bytes out.
+///
+/// # Errors
+///
+/// Returns an error when the request or the plugin options are not valid, or when the code
+/// generation fails.
 pub fn run_with_bytes(buf: &[u8]) -> Result<Vec<u8>, Error> {
     let request = GenerateRequestView::decode_view(buf)?;
     let config = if request.plugin_options.is_empty() {
@@ -36,7 +64,7 @@ pub fn run_with_bytes(buf: &[u8]) -> Result<Vec<u8>, Error> {
     let code = codegen::generate(&request, &config)?;
     let response = GenerateResponse {
         files: vec![plugin::File {
-            name: config.output.clone(),
+            name: config.output,
             contents: code.into_bytes(),
             ..Default::default()
         }],

@@ -1,3 +1,7 @@
+//! Example of the code that sqlc-gen-sqlx generates for enum types.
+
+// `sqlc generate` writes this module.
+#[allow(missing_docs, unreachable_pub)]
 #[path = "queries.rs"]
 #[cfg(test)]
 mod queries;
@@ -60,4 +64,4 @@ async fn test_enum_roundtrip() {
     assert_eq!(active.len(), 1);
 }
 
-fn main() {}
+const fn main() {}

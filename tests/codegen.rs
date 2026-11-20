@@ -1,3 +1,5 @@
+//! Snapshot tests of the code that the plugin generates.
+
 use buffa::Message as _;
 use sqlc_gen_sqlx::plugin::{
     Catalog, Column, GenerateRequest, Identifier, Parameter, Query, Schema, Table,

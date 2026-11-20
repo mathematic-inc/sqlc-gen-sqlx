@@ -1,6 +1,7 @@
 use crate::config::TypeOverride;
 use std::collections::HashMap;
 
+/// A Rust type that a PostgreSQL type resolved to.
 #[derive(Debug, Clone)]
 pub struct ResolvedType {
     /// Owned Rust type used for row struct fields, array contents, and any
@@ -14,6 +15,7 @@ pub struct ResolvedType {
     /// codegen runs a lifetime-injection pass when emitting into positions
     /// that require a named lifetime (struct field, where clause).
     pub borrowed_rust_type: Option<String>,
+    /// Whether the value is cheap to copy. A nullable or array type is never cheap to copy.
     pub copy_cheap: bool,
 }
 
@@ -29,33 +31,24 @@ struct OverrideEntry {
     copy_cheap: bool,
 }
 
-pub struct TypeMap {
-    defaults: HashMap<&'static str, (&'static str, bool)>,
-    type_overrides: HashMap<String, OverrideEntry>,
-    custom_types: HashMap<String, (String, bool)>,
-}
-
-impl TypeMap {
-    pub fn new(overrides: &[TypeOverride], copy_cheap_types: &[String]) -> Self {
-        let mut defaults: HashMap<&'static str, (&'static str, bool)> = HashMap::new();
-
-        // Boolean
-        for n in ["bool", "boolean", "pg_catalog.bool"] {
-            defaults.insert(n, ("bool", true));
-        }
-
-        // Integer types
-        for n in [
+/// Built-in PostgreSQL type names. Each row gives the names of one type, its Rust type, and
+/// whether the Rust type is cheap to copy.
+const DEFAULT_TYPES: &[(&[&str], &str, bool)] = &[
+    (&["bool", "boolean", "pg_catalog.bool"], "bool", true),
+    (
+        &[
             "int2",
             "smallint",
             "pg_catalog.int2",
             "smallserial",
             "serial2",
             "pg_catalog.serial2",
-        ] {
-            defaults.insert(n, ("i16", true));
-        }
-        for n in [
+        ],
+        "i16",
+        true,
+    ),
+    (
+        &[
             "int4",
             "integer",
             "int",
@@ -63,35 +56,35 @@ impl TypeMap {
             "serial",
             "serial4",
             "pg_catalog.serial4",
-        ] {
-            defaults.insert(n, ("i32", true));
-        }
-        for n in [
+        ],
+        "i32",
+        true,
+    ),
+    (
+        &[
             "int8",
             "bigint",
             "pg_catalog.int8",
             "bigserial",
             "serial8",
             "pg_catalog.serial8",
-        ] {
-            defaults.insert(n, ("i64", true));
-        }
-
-        // Float types
-        for n in ["float4", "real", "pg_catalog.float4"] {
-            defaults.insert(n, ("f32", true));
-        }
-        for n in ["float8", "float", "double precision", "pg_catalog.float8"] {
-            defaults.insert(n, ("f64", true));
-        }
-
-        // Decimal / numeric types
-        for n in ["numeric", "decimal", "pg_catalog.numeric"] {
-            defaults.insert(n, ("bigdecimal::BigDecimal", false));
-        }
-
-        // String types
-        for n in [
+        ],
+        "i64",
+        true,
+    ),
+    (&["float4", "real", "pg_catalog.float4"], "f32", true),
+    (
+        &["float8", "float", "double precision", "pg_catalog.float8"],
+        "f64",
+        true,
+    ),
+    (
+        &["numeric", "decimal", "pg_catalog.numeric"],
+        "bigdecimal::BigDecimal",
+        false,
+    ),
+    (
+        &[
             "text",
             "varchar",
             "pg_catalog.varchar",
@@ -101,109 +94,113 @@ impl TypeMap {
             "citext",
             "name",
             "pg_catalog.name",
-        ] {
-            defaults.insert(n, ("String", false));
-        }
-
-        // Bytes
-        for n in ["bytea", "blob", "pg_catalog.bytea"] {
-            defaults.insert(n, ("Vec<u8>", false));
-        }
-
-        // UUID
-        defaults.insert("uuid", ("uuid::Uuid", true));
-
-        // JSON
-        for n in ["json", "jsonb"] {
-            defaults.insert(n, ("serde_json::Value", false));
-        }
-
-        // Timestamps
-        for n in [
+        ],
+        "String",
+        false,
+    ),
+    (&["bytea", "blob", "pg_catalog.bytea"], "Vec<u8>", false),
+    (&["uuid"], "uuid::Uuid", true),
+    (&["json", "jsonb"], "serde_json::Value", false),
+    (
+        &[
             "timestamptz",
             "pg_catalog.timestamptz",
             "timestamp with time zone",
-        ] {
-            defaults.insert(n, ("chrono::DateTime<chrono::Utc>", false));
-        }
-        for n in [
+        ],
+        "chrono::DateTime<chrono::Utc>",
+        false,
+    ),
+    (
+        &[
             "timestamp",
             "pg_catalog.timestamp",
             "timestamp without time zone",
-        ] {
-            defaults.insert(n, ("chrono::NaiveDateTime", false));
-        }
-        defaults.insert("date", ("chrono::NaiveDate", true));
-        for n in ["time", "pg_catalog.time", "time without time zone"] {
-            defaults.insert(n, ("chrono::NaiveTime", false));
-        }
+        ],
+        "chrono::NaiveDateTime",
+        false,
+    ),
+    (&["date"], "chrono::NaiveDate", true),
+    (
+        &["time", "pg_catalog.time", "time without time zone"],
+        "chrono::NaiveTime",
+        false,
+    ),
+    (&["inet", "cidr"], "ipnetwork::IpNetwork", false),
+    (&["macaddr"], "mac_address::MacAddress", true),
+    (
+        &["hstore"],
+        "std::collections::HashMap<String, Option<String>>",
+        false,
+    ),
+    (
+        &["interval", "pg_catalog.interval"],
+        "sqlx::postgres::types::PgInterval",
+        false,
+    ),
+    (&["money"], "sqlx::postgres::types::PgMoney", true),
+    (
+        &["oid", "pg_catalog.oid"],
+        "sqlx::postgres::types::Oid",
+        true,
+    ),
+    (&["ltree", "lquery"], "String", false),
+    (
+        &["int4range", "pg_catalog.int4range"],
+        "sqlx::postgres::types::PgRange<i32>",
+        false,
+    ),
+    (
+        &["int8range", "pg_catalog.int8range"],
+        "sqlx::postgres::types::PgRange<i64>",
+        false,
+    ),
+    (
+        &["numrange", "pg_catalog.numrange"],
+        "sqlx::postgres::types::PgRange<bigdecimal::BigDecimal>",
+        false,
+    ),
+    (
+        &["tsrange", "pg_catalog.tsrange"],
+        "sqlx::postgres::types::PgRange<chrono::NaiveDateTime>",
+        false,
+    ),
+    (
+        &["tstzrange", "pg_catalog.tstzrange"],
+        "sqlx::postgres::types::PgRange<chrono::DateTime<chrono::Utc>>",
+        false,
+    ),
+    (
+        &["daterange", "pg_catalog.daterange"],
+        "sqlx::postgres::types::PgRange<chrono::NaiveDate>",
+        false,
+    ),
+    (
+        &["bit", "varbit", "pg_catalog.varbit"],
+        "sqlx::types::BitVec",
+        false,
+    ),
+];
 
-        // Network
-        for n in ["inet", "cidr"] {
-            defaults.insert(n, ("ipnetwork::IpNetwork", false));
-        }
-        defaults.insert("macaddr", ("mac_address::MacAddress", true));
+/// Map from PostgreSQL type names to Rust types.
+#[derive(Debug)]
+pub struct TypeMap {
+    defaults: HashMap<&'static str, (&'static str, bool)>,
+    type_overrides: HashMap<String, OverrideEntry>,
+    custom_types: HashMap<String, (String, bool)>,
+}
 
-        // Misc
-        defaults.insert(
-            "hstore",
-            ("std::collections::HashMap<String, Option<String>>", false),
-        );
-        for n in ["interval", "pg_catalog.interval"] {
-            defaults.insert(n, ("sqlx::postgres::types::PgInterval", false));
-        }
-        defaults.insert("money", ("sqlx::postgres::types::PgMoney", true));
-        defaults.insert("oid", ("sqlx::postgres::types::Oid", true));
-        defaults.insert("pg_catalog.oid", ("sqlx::postgres::types::Oid", true));
-        for n in ["ltree", "lquery"] {
-            defaults.insert(n, ("String", false));
-        }
-
-        // Range types
-        for n in ["int4range", "pg_catalog.int4range"] {
-            defaults.insert(n, ("sqlx::postgres::types::PgRange<i32>", false));
-        }
-        for n in ["int8range", "pg_catalog.int8range"] {
-            defaults.insert(n, ("sqlx::postgres::types::PgRange<i64>", false));
-        }
-        for n in ["numrange", "pg_catalog.numrange"] {
-            defaults.insert(
-                n,
-                (
-                    "sqlx::postgres::types::PgRange<bigdecimal::BigDecimal>",
-                    false,
-                ),
-            );
-        }
-        for n in ["tsrange", "pg_catalog.tsrange"] {
-            defaults.insert(
-                n,
-                (
-                    "sqlx::postgres::types::PgRange<chrono::NaiveDateTime>",
-                    false,
-                ),
-            );
-        }
-        for n in ["tstzrange", "pg_catalog.tstzrange"] {
-            defaults.insert(
-                n,
-                (
-                    "sqlx::postgres::types::PgRange<chrono::DateTime<chrono::Utc>>",
-                    false,
-                ),
-            );
-        }
-        for n in ["daterange", "pg_catalog.daterange"] {
-            defaults.insert(
-                n,
-                ("sqlx::postgres::types::PgRange<chrono::NaiveDate>", false),
-            );
-        }
-
-        // Bit types
-        for n in ["bit", "varbit", "pg_catalog.varbit"] {
-            defaults.insert(n, ("sqlx::types::BitVec", false));
-        }
+impl TypeMap {
+    /// Make the map of the built-in types, with the user overrides and cheap-to-copy types applied.
+    #[must_use]
+    pub fn new(overrides: &[TypeOverride], copy_cheap_types: &[String]) -> Self {
+        let defaults: HashMap<&'static str, (&'static str, bool)> = DEFAULT_TYPES
+            .iter()
+            .flat_map(|&(names, rust_type, copy_cheap)| {
+                names
+                    .iter()
+                    .map(move |&name| (name, (rust_type, copy_cheap)))
+            })
+            .collect();
 
         let mut type_overrides: HashMap<String, OverrideEntry> = HashMap::new();
         for o in overrides {
@@ -250,6 +247,10 @@ impl TypeMap {
             .insert(pg_name.to_lowercase(), (rust_name.to_string(), copy_cheap));
     }
 
+    /// Resolve a PostgreSQL type, with at most one array dimension.
+    ///
+    /// Returns `None` when the type is not known.
+    #[must_use]
     pub fn resolve_pg_type(
         &self,
         pg_type: &str,
@@ -259,6 +260,10 @@ impl TypeMap {
         self.resolve_pg_type_dims(pg_type, nullable, usize::from(is_array))
     }
 
+    /// Resolve a PostgreSQL type with a number of array dimensions.
+    ///
+    /// Returns `None` when the type is not known.
+    #[must_use]
     pub fn resolve_pg_type_dims(
         &self,
         pg_type: &str,
@@ -302,6 +307,11 @@ impl TypeMap {
         })
     }
 
+    /// Resolve the type of a column, with at most one array dimension. A column override wins over
+    /// the type.
+    ///
+    /// Returns `None` when the type is not known.
+    #[must_use]
     pub fn resolve_column(
         &self,
         pg_type: &str,
@@ -319,6 +329,11 @@ impl TypeMap {
         )
     }
 
+    /// Resolve the type of a column with a number of array dimensions. A column override wins over
+    /// the type.
+    ///
+    /// Returns `None` when the type is not known.
+    #[must_use]
     pub fn resolve_column_dims(
         &self,
         pg_type: &str,
@@ -358,12 +373,16 @@ impl TypeMap {
 /// Per-column override stored separately from the type-level map.
 #[derive(Debug, Clone)]
 pub struct ColumnOverride {
+    /// Owned Rust type. `None` means the type of the PostgreSQL type.
     pub owned: Option<String>,
+    /// Borrowed Rust type. `None` means the override did not opt into borrowed mode.
     pub borrowed: Option<String>,
+    /// Whether the value is cheap to copy.
     pub copy_cheap: bool,
 }
 
 impl ColumnOverride {
+    /// Make an override that has only an owned type.
     #[cfg(test)]
     pub fn owned_form(rust_type: impl Into<String>, copy_cheap: bool) -> Self {
         Self {
@@ -372,6 +391,15 @@ impl ColumnOverride {
             copy_cheap,
         }
     }
+}
+
+/// Number of array dimensions of a column. `declared` is the count that sqlc gives. It is 0 when
+/// sqlc only sets `is_array`.
+pub(crate) fn array_dimensions(declared: i32, is_array: bool) -> usize {
+    usize::try_from(declared)
+        .ok()
+        .filter(|&dims| dims > 0)
+        .unwrap_or_else(|| usize::from(is_array))
 }
 
 fn wrap_owned(inner: &str, nullable: bool, array_dims: usize) -> String {
@@ -406,6 +434,8 @@ fn wrap_borrowed(
     }
 }
 
+/// Collect the overrides that name a column, by column.
+#[must_use]
 pub fn build_column_overrides(overrides: &[TypeOverride]) -> HashMap<String, ColumnOverride> {
     overrides
         .iter()

@@ -1,18 +1,23 @@
+/// An error of the plugin.
 #[derive(Debug)]
 pub enum Error {
+    /// Reading stdin or writing stdout failed.
     Io(std::io::Error),
+    /// The request is not valid protobuf.
     Decode(buffa::DecodeError),
+    /// The plugin options are not valid JSON.
     Json(serde_json::Error),
+    /// The code generation failed. The text says why.
     Codegen(String),
 }
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::Io(e) => write!(f, "io error: {e}"),
-            Error::Decode(e) => write!(f, "proto decode error: {e}"),
-            Error::Json(e) => write!(f, "json error: {e}"),
-            Error::Codegen(msg) => write!(f, "codegen error: {msg}"),
+            Self::Io(e) => write!(f, "io error: {e}"),
+            Self::Decode(e) => write!(f, "proto decode error: {e}"),
+            Self::Json(e) => write!(f, "json error: {e}"),
+            Self::Codegen(msg) => write!(f, "codegen error: {msg}"),
         }
     }
 }
@@ -20,10 +25,10 @@ impl std::fmt::Display for Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Error::Io(e) => Some(e),
-            Error::Decode(e) => Some(e),
-            Error::Json(e) => Some(e),
-            Error::Codegen(_) => None,
+            Self::Io(e) => Some(e),
+            Self::Decode(e) => Some(e),
+            Self::Json(e) => Some(e),
+            Self::Codegen(_) => None,
         }
     }
 }

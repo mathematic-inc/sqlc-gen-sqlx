@@ -2,6 +2,7 @@
 name = "batch"
 version = "0.1.0"
 edition = "2024"
+license = "MIT OR Apache-2.0"
 publish = false
 
 [dependencies]
@@ -9,3 +10,6 @@ futures-core = "0.3.34"
 futures-util = "0.3.34"
 sqlx = { workspace = true }
 tokio = { workspace = true }
+
+[lints]
+workspace = true

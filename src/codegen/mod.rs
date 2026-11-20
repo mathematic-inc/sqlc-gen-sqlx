@@ -10,6 +10,11 @@ mod enums;
 pub(crate) mod lifetimes;
 mod query;
 
+/// Generate the Rust source of the output file for a request.
+///
+/// # Errors
+///
+/// Returns an error when a query, a type or the formatting of the output is not valid.
 pub fn generate(request: &GenerateRequestView<'_>, config: &Config) -> Result<String, Error> {
     let mut type_map = TypeMap::new(&config.overrides, &config.copy_cheap_types);
     let catalog_info = catalog::walk(request, &mut type_map)?;
@@ -67,7 +72,7 @@ pub fn generate(request: &GenerateRequestView<'_>, config: &Config) -> Result<St
         emitter.push(composites::gen_composite(info, &config.composite_derives)?);
     }
 
-    for q in request.queries.iter() {
+    for q in &request.queries {
         let tokens = match q.cmd {
             ":exec" => query::gen_exec(q, &type_map, config, &col_overrides)?,
             ":execrows" => query::gen_execrows(q, &type_map, config, &col_overrides)?,

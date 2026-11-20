@@ -1,6 +1,10 @@
+//! Example of the code that sqlc-gen-sqlx generates with borrowed parameter types.
+
 #[cfg(test)]
 use sqlx::{Connection as _, PgConnection};
 
+// `sqlc generate` writes this module.
+#[allow(missing_docs, unreachable_pub)]
 #[path = "queries.rs"]
 #[cfg(test)]
 mod queries;
@@ -48,4 +52,4 @@ async fn test_borrowed_author_roundtrip() {
         .expect("delete");
 }
 
-fn main() {}
+const fn main() {}

@@ -17,7 +17,10 @@ use crate::{catalog::CompositeInfo, error::Error, ident::type_ident};
 ///     pub zip: Option<i32>,
 /// }
 /// ```
-pub fn gen_composite(info: &CompositeInfo, extra_derives: &[String]) -> Result<TokenStream, Error> {
+pub(super) fn gen_composite(
+    info: &CompositeInfo,
+    extra_derives: &[String],
+) -> Result<TokenStream, Error> {
     let rust_name = type_ident(&info.rust_name);
     let type_name = &info.type_name;
 

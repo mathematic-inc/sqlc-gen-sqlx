@@ -1,6 +1,10 @@
+//! Example of the code that sqlc-gen-sqlx generates for basic queries.
+
 #[cfg(test)]
 use sqlx::{Connection as _, PgConnection};
 
+// `sqlc generate` writes this module.
+#[allow(missing_docs, unreachable_pub)]
 #[path = "queries.rs"]
 #[cfg(test)]
 mod queries;
@@ -49,4 +53,4 @@ async fn test_author_roundtrip() {
     assert_eq!(rows, 1);
 }
 
-fn main() {}
+const fn main() {}

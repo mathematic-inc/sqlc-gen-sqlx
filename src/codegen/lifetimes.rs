@@ -7,7 +7,7 @@ use syn::visit_mut::VisitMut;
 ///
 /// Used when emitting borrowed types into positions that cannot rely on
 /// elision: struct field types and `where Item = ...` clauses.
-pub fn inject_lifetime(rust_type: &str, lifetime: &str) -> Result<String, Error> {
+pub(crate) fn inject_lifetime(rust_type: &str, lifetime: &str) -> Result<String, Error> {
     let mut ty: syn::Type = syn::parse_str(rust_type)
         .map_err(|e| Error::Codegen(format!("invalid Rust type '{rust_type}': {e}")))?;
     let mut visitor = LifetimeInjector {
@@ -23,10 +23,7 @@ struct LifetimeInjector {
 
 impl VisitMut for LifetimeInjector {
     fn visit_type_reference_mut(&mut self, node: &mut syn::TypeReference) {
-        let needs_inject = match &node.lifetime {
-            None => true,
-            Some(lt) => lt.ident == "_",
-        };
+        let needs_inject = node.lifetime.as_ref().is_none_or(|lt| lt.ident == "_");
         if needs_inject {
             node.lifetime = Some(self.lifetime.clone());
         }
